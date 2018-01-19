@@ -10,7 +10,8 @@
   "license": "ISC",
   "dependencies": {
     "mysql2": "^1.5.1",
-    "node-telegram-bot-api": "^0.30.0",
-    "sequelize": "^4.31.2"
+    "sequelize": "^4.31.2",
+    "telegraf": "^3.17.5",
+    "telegraf-calendar-telegram": "^1.5.2"
   }
 }
