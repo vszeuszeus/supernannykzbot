@@ -19,7 +19,7 @@ const calendar = new Calendar(bot, {
 
 const database = "supernanny";
 const user = "root";
-const password = "s12q!Bza";
+const password = "123";
 const host = "localhost";
 
 const sequelize = new Sequelize(database, user, password, {
@@ -63,81 +63,83 @@ const PrepareOrdersNanny = sequelize.define('prepare_orders_nanny', {
     user_id: Sequelize.INTEGER.UNSIGNED,
     nanny_id: Sequelize.INTEGER.UNSIGNED,
     start: Sequelize.DATE,
-    end: Sequelize.DATE,
+    end: Sequelize.DATE
 });
+
+const Nanny = sequelize.define('nannies', {
+    id: {
+        type: Sequelize.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
+    user_id: Sequelize.INTEGER.UNSIGNED,
+    biography: Sequelize.TEXT
+});
+
+Nanny.hasMany(PrepareOrdersNanny);
+PrepareOrdersNanny.belongsTo(Nanny, {foreignKey: "nanny_id"});
+Nanny.belongsTo(User, {foreignKey: "user_id"});
 //END MODELS
 
 
 
-
-let nanny_orders_array = {};
-let pickerDates = {};
-
-let NewNannyOrder = function (start_date = null, end_date = null, start_time = null, end_time = null) {
-    this.start_date = start_date;
-    this.end_date = end_date;
-    this.start_time = start_time;
-    this.end_time = end_time;
+let userOrders = {
+    setOrder : function (newNannyOrder) {
+        if(!userOrders.hasOwnProperty(newNannyOrder.telegram_id)){
+            userOrders[newNannyOrder.telegram_id] = newNannyOrder;
+        } else {
+            return false;
+        }
+    },
+    setOrderStartDate: function (ctx, date) {
+        if(userOrders.hasOwnProperty(ctx.update.callback_query.message.chat.id)) {
+            userOrders[ctx.update.callback_query.message.chat.id].order.startDate = date;
+        } else {
+            return false;
+        }
+    },
+    getOrderTime: function(ctx, type = "start") {
+        if(userOrders.hasOwnProperty(ctx.update.callback_query.message.chat.id)){
+            return userOrders[ctx.update.callback_query.message.chat.id].order[type + "Time"];
+        } else {
+            return false;
+        }
+    },
+    setOrderTime: function(ctx, time, type = "start"){
+        if(userOrders.hasOwnProperty(ctx.update.callback_query.message.chat.id)) {
+            userOrders[ctx.update.callback_query.message.chat.id].order[type + "Time"] = time;
+        } else {
+            return false;
+        }
+    }
 };
 
-calendar.setDateListener((context, date) => {
-    //console.log(context);
-    console.log(context.update);
-    //console.log(context);
-    let orderNanny = nanny_orders_array[context.update.callback_query.message.chat.id];
-    if (orderNanny) {
-        orderNanny.end_date = date;
-        console.log(nanny_orders_array);
-        sendEndTimePicker(context);
-    }
-    else {
-        nanny_orders_array[context.update.callback_query.message.chat.id] = new NewNannyOrder(date);
-        console.log(nanny_orders_array);
-        sendStartTimePicker(context);
-    }
+
+let NewNannyOrder = function (city, ctx, phone = null) {
+    this.city = city;
+    this.phone = phone;
+    this.nanny_id = null;
+    this.offer = null;
+    this.telegram_id = ctx.update.callback_query.message.chat.id;
+    this.order = {
+        startDate : null,
+        endDate : null,
+        startTime : null,
+        endTime : null
+    };
+
+
+};
+
+calendar.setDateListener((ctx, date) => {
+    userOrders.setOrderStartDate(ctx, date);
+    sendOrderTimeChooser(ctx, "start");
 });
 
 function sendCalendarStartDate(ctx) {
     return ctx.reply('Выберите пожалуйста начальный день бронирования', calendar.getCalendar());
 }
 
-function sendCalendarEndDate(ctx) {
-    return ctx.reply('Выберите пожалуйста конечный день бронирования', calendar.getCalendar());
-}
-
-function sendStartTimePicker(ctx) {
-    ctx.deleteMessage(ctx.update.callback_query.message.chat.id, ctx.update.callback_query.message.message_id);
-    let start_time = nanny_orders_array[ctx.update.callback_query.message.chat.id].start_time;
-    if(!start_time) {
-        start_time = new Date().getHours() + ":00";
-        nanny_orders_array[ctx.update.callback_query.message.chat.id].start_time = start_time;
-    }
-    makeDatePicker(ctx, start_time, "start");
-}
-
-function sendEndTimePicker(ctx) {
-    ctx.deleteMessage(ctx.update.callback_query.message.chat.id, ctx.update.callback_query.message.message_id);
-}
-
-
-function makeDatePicker(ctx, time, option = "start") {
-
-    let val = (option === "start") ? "datePicker_start" : "datePicker_end";
-    let text = (option === "start") ? 'Задайте начальное время брони' : 'Задайте конечное время брони' ;
-
-    return ctx.reply(text, {
-        "reply_markup": {
-            "inline_keyboard": [
-                [
-                    {text: " - 1 час", callback_data: val + "_minus_chas"},
-                    {text: time, callback_data: "datePicker_quit"},
-                    {text: " + 1 час", callback_data: val + "_plus_chas"}
-                ],
-                [{text: "Готово", callback_data: "datePicker_quit"},]
-            ]
-        }
-    });
-}
 
 bot.action('/^datePicker[.]+/g', (ctx) => {
     console.log('sdfsdf');
@@ -145,23 +147,244 @@ bot.action('/^datePicker[.]+/g', (ctx) => {
 });
 
 bot.on('callback_query', (ctx) => {
-    console.log(ctx);
+    let cData = ctx.update.callback_query.data;
+    let splitData = cData.split('_');
+    switch(splitData[0]) {
+        case "giveNanny" :
+            switch (splitData[1]) {
+                case "yes" :
+                    sendOffer(ctx);
+                    break;
+                case "no" :
+                    sendQuestionNanny(ctx);
+                    break;
+            }
+            break;
+
+        case "offer" :
+            switch (splitData[1]) {
+                case "yes":
+                    sendQuestionCity(ctx);
+                    break;
+            }
+            break;
+
+        case "needCity":
+            switch (splitData[1]) {
+                case "Astana":
+                    userOrders.setOrder(new NewNannyOrder("Astana", ctx));
+                    break;
+                case "Almata":
+                    userOrders.setOrder(new NewNannyOrder("Astana", ctx));
+                    break;
+            }
+            sendOrderDateChooser(ctx);
+            break;
+
+        case "datePicker":
+            console.log(userOrders);
+            if (splitData[1] === "start" || splitData[1] === "end") {
+                recalcTimePicker(ctx);
+            }
+            if(splitData[1] === "quit"){
+                switch(splitData[2]){
+                    case "start":
+                        sendOrderTimeChooser(ctx, "end")
+                        break;
+                    case "end":
+                        getFreeNannies(ctx);
+                }
+            }
+            break;
+
+        default:
+            console.log('good');
+            break;
+    }
+
 });
+
+function sendOffer(ctx){
+    deleteMessage(ctx);
+    return ctx.reply('Перед тем как выбрать няню, просьба ознакомиться с публичной офертой.', {
+        "reply_markup": {
+            "inline_keyboard": [
+                [{text: "Прочитал", callback_data: "offer_yes"}],
+                [{text: "Отмена", callback_data: "cancel"}]]
+        }
+    });
+}
+
+function sendQuestionNanny(ctx){
+    deleteMessage(ctx);
+    return ctx.reply('Вы няня?.', {
+        "reply_markup": {
+            "inline_keyboard": [
+                [{text: "Да", callback_data: "iAmNanny_yes"}],
+                [{text: "Нет", callback_data: "iAmNanny_no"}]]
+        }
+    });
+}
+
+function sendQuestionCity(ctx) {
+    deleteMessage(ctx);
+    return ctx.reply('В каком городе вам нужна няня?', {
+        "reply_markup": {
+            "inline_keyboard": [
+                [{text: "Астана", callback_data: "needCity_Astana"}],
+                [{text: "Алмата", callback_data: "needCity_Almata"}]]
+        }
+    });
+}
+
+function sendOrderDateChooser(ctx){
+    deleteMessage(ctx);
+    return ctx.reply('В какое время Вам необходима няня? \n' +
+        '1. День с 9:00-19:00 1500-2000т.\n' +
+        '2. Вечер 2000-2500т.\n' +
+        '3. Ночь 2500т.\n' +
+        'Пожалуйста, выберите в календаре дату бронирования', calendar.getCalendar());
+}
+
+function sendOrderTimeChooser(ctx, type = "start"){
+    deleteMessage(ctx);
+    let time = null;
+    if(userOrders.getOrderTime(ctx, type)) {
+        time = userOrders.getOrderTime(ctx, type);
+    } else {
+        time = new Date().getHours() + ":00";
+        userOrders.setOrderTime(ctx, time, type);
+    }
+    makeDatePicker(ctx, time, type);
+}
+
+function makeDatePicker(ctx, time, type = "start") {
+
+    let val = (type === "start") ? "datePicker_start" : "datePicker_end";
+    let text = (type === "start") ? 'Задайте начальное время брони' : 'Задайте конечное время брони' ;
+
+    return ctx.reply(text, {
+        "reply_markup": {
+            "inline_keyboard": [
+                [
+                    {text: " - 1 час", callback_data: val + "_minus_chas"},
+                    {text: time, callback_data: "datePicker_quit_" + type},
+                    {text: " + 1 час", callback_data: val + "_plus_chas"}
+                ],
+                [
+                    {text: " - 30 мин", callback_data: val +  "_minus_30min"},
+                    {text: " + 30 мин", callback_data: val +  "_plus_30min"}
+                ],
+                [{text: "Готово", callback_data: "datePicker_quit_" + type}]
+            ]
+        }
+    });
+}
+
+function recalcTimePicker(ctx){
+    let cData = ctx.update.callback_query.data;
+    let splitData = cData.split("_");
+    let nowOrderTime = userOrders.getOrderTime(ctx, splitData[1]);
+    if(!nowOrderTime) return false;
+    let splitPickerTime = nowOrderTime.split(':');
+    let hoursSplit = splitPickerTime[0];
+    let minutsSplit = splitPickerTime[1];
+    switch (splitData[2]) {
+        case "minus":
+            switch (splitData[3]) {
+                case "chas":
+                    if(hoursSplit === "00" || hoursSplit === "0"){
+                        hoursSplit = "23";
+                    } else {
+                        hoursSplit = +hoursSplit  - 1;
+                    }
+                    break;
+                case "30min":
+                    if(minutsSplit === "00"){
+                        if(hoursSplit === "00" || hoursSplit === "0"){
+                            hoursSplit = "23";
+                        } else {
+                            hoursSplit = +hoursSplit  - 1;
+                        }
+                        minutsSplit = "30";
+                    } else {
+                        minutsSplit = "00";
+                    }
+                    break;
+            }
+            break;
+        case "plus" :
+            switch (splitData[3]) {
+                case "chas":
+                    if(hoursSplit === "23"){
+                        hoursSplit = "00";
+                    } else {
+                        hoursSplit = +hoursSplit + 1;
+                    }
+                    break;
+                case "30min":
+                    if(minutsSplit === "30"){
+                        if(hoursSplit === "23"){
+                            hoursSplit = "00";
+                        } else {
+                            hoursSplit = +hoursSplit  + 1;
+                        }
+                        minutsSplit = "00";
+                    } else {
+                        minutsSplit = "30";
+                    }
+                    break;
+            }
+            break;
+    }
+    nowOrderTime = hoursSplit + ":" + minutsSplit;
+    userOrders.setOrderTime(ctx, nowOrderTime, splitData[1]);
+    sendOrderTimeChooser(ctx, splitData[1]);
+}
+
+function getFreeNannies(ctx){
+    Nanny.findAndCountAll({
+        include: {
+            model: User, required: true
+        },
+        limit: 3
+    }).then(nannies => {
+        if(nannies.rows){
+            nannies.rows.forEach(function(item){
+                ctx.telegram.sendPhoto(ctx.update.callback_query.message.chat.id, "image.jpeg" , {
+                    "reply_markup": {
+                        "inline_keyboard": [
+                            [{text: "Да", callback_data: "chooseNanny_" + item.dataValues.id}]
+                        ]
+                    },
+                    "caption" : item.dataValues.biography.substr(0, 195)
+                })
+            })
+        }
+    });
+}
+
+function deleteMessage(ctx){
+    ctx.deleteMessage(ctx.update.callback_query.message.chat.id, ctx.update.callback_query.message.message_id);
+}
 
 
 
 
 bot.start((ctx) => {
-    return ctx.reply('Приветствие, запрос контактных данных!', {
+    return ctx.reply('Здесь вы можете выбрать и пригласить бебиситтера с сервиса почасовых супернянь для своего' +
+        ' ребенка от 0 до 10 лет. Наши суперняни отобраны, обучены, прошли медосмотр. Вы хотите пригласить почасовую суперняню?', {
         "reply_markup": {
-            "one_time_keyboard": true,
-            "keyboard": [[{
-                text: "Поделиться контактными данными",
-                request_contact: true
-            }], ["Отмена"]]
+            "inline_keyboard": [
+                [{text: "Да", callback_data: "giveNanny_yes"}],
+                [{text: "Нет", callback_data: "giveNanny_no"}]]
         }
     })
 });
+
+
+
+
 
 bot.on('contact', (ctx) => {
     console.log(ctx);
