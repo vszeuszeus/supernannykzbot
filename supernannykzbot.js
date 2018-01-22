@@ -19,7 +19,7 @@ const calendar = new Calendar(bot, {
 
 const database = "supernanny";
 const user = "root";
-const password = "123";
+const password = "s12q!Bza";
 const host = "localhost";
 
 const sequelize = new Sequelize(database, user, password, {
@@ -53,7 +53,7 @@ const User = sequelize.define('users', {
     telegram_id: Sequelize.BIGINT
 });
 
-const PrepareOrdersNanny = sequelize.define('prepare_orders_nanny', {
+const NannyOrders = sequelize.define('nanny_orders', {
     id:
         {
             type: Sequelize.INTEGER,
@@ -76,9 +76,10 @@ const Nanny = sequelize.define('nannies', {
     biography: Sequelize.TEXT
 });
 
-Nanny.hasMany(PrepareOrdersNanny);
-PrepareOrdersNanny.belongsTo(Nanny, {foreignKey: "nanny_id"});
+Nanny.hasMany(NannyOrders, {foreignKey: "nanny_id", as : "orders"});
+NannyOrders.belongsTo(Nanny, {foreignKey: "nanny_id"});
 Nanny.belongsTo(User, {foreignKey: "user_id"});
+
 //END MODELS
 
 
@@ -111,6 +112,21 @@ let userOrders = {
         } else {
             return false;
         }
+    },
+    getOrderFullTime: function(ctx, type = "start") {
+        if(userOrders.hasOwnProperty(ctx.update.callback_query.message.chat.id)){
+            return userOrders[ctx.update.callback_query.message.chat.id].order.startDate
+                + " " + userOrders[ctx.update.callback_query.message.chat.id].order[type + "Time"];
+        } else {
+            return false;
+        }
+    },
+    setOrderNanny: function (ctx, nanny_id) {
+        if(userOrders.hasOwnProperty(ctx.update.callback_query.message.chat.id)){
+            userOrders[ctx.update.callback_query.message.chat.id].nanny_id = nanny_id;
+        } else {
+            return false;
+        }
     }
 };
 
@@ -119,6 +135,7 @@ let NewNannyOrder = function (city, ctx, phone = null) {
     this.city = city;
     this.phone = phone;
     this.nanny_id = null;
+    this.saved = false;
     this.offer = null;
     this.telegram_id = ctx.update.callback_query.message.chat.id;
     this.order = {
@@ -189,12 +206,17 @@ bot.on('callback_query', (ctx) => {
             if(splitData[1] === "quit"){
                 switch(splitData[2]){
                     case "start":
-                        sendOrderTimeChooser(ctx, "end")
+                        sendOrderTimeChooser(ctx, "end");
                         break;
                     case "end":
-                        getFreeNannies(ctx);
+                        sendFreeNannies(ctx);
                 }
             }
+            break;
+
+        case "chooseNanny":
+            userOrders.setOrderNanny(ctx, splitData[1]);
+            sentPayment(ctx);
             break;
 
         default:
@@ -342,24 +364,43 @@ function recalcTimePicker(ctx){
     sendOrderTimeChooser(ctx, splitData[1]);
 }
 
-function getFreeNannies(ctx){
-    Nanny.findAndCountAll({
-        include: {
-            model: User, required: true
-        },
-        limit: 3
-    }).then(nannies => {
-        if(nannies.rows){
-            nannies.rows.forEach(function(item){
-                ctx.telegram.sendPhoto(ctx.update.callback_query.message.chat.id, "image.jpeg" , {
-                    "reply_markup": {
-                        "inline_keyboard": [
-                            [{text: "Да", callback_data: "chooseNanny_" + item.dataValues.id}]
+function sendFreeNannies(ctx){
+    deleteMessage(ctx);
+    sequelize.query('' +
+        "SELECT nannies.id, nannies.biography, nannies.user_id  FROM nannies " +
+        "WHERE NOT EXISTS (" +
+            " SELECT * " +
+            " FROM nanny_orders " +
+            " WHERE nanny_orders.nanny_id = nannies.id " +
+            " AND nanny_orders.start BETWEEN '" + userOrders.getOrderFullTime(ctx, "start") +
+                "' AND '" + userOrders.getOrderFullTime(ctx, "end") + "' " +
+            " AND nanny_orders.end BETWEEN '" + userOrders.getOrderFullTime(ctx, "start") +
+                "' AND '" + userOrders.getOrderFullTime(ctx, "end") + "' " +
+        ") " +
+        "LIMIT 3 ")
+        .then(nannies => {
+            nannies[0].forEach(function(item) {
+                ctx.replyWithPhoto({source: "image.jpeg"} , {
+                    caption : item.biography.substr(0, 197) + "...",
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{text: "Заказать", callback_data: "chooseNanny_" + item.id}]
                         ]
-                    },
-                    "caption" : item.dataValues.biography.substr(0, 195)
-                })
-            })
+                    }
+
+                });
+            });
+
+    });
+}
+
+function sentPayment(ctx) {
+    ctx.reply('Для того, чтобы забронировать время няни вам необходимо оплатить. Следующие кнопки запросят Ваши контактные данные. Какой способ оплаты удобен для вас?', {
+        reply_markup: {
+            "one_time_keyboard": true,
+            keyboard: [
+                [{text: "Банковской картой", request_contact: true}, {text: "Qiwi терминал", request_contact: true}]
+            ]
         }
     });
 }
@@ -405,11 +446,11 @@ bot.on('contact', (ctx) => {
             updated_at: new Date(),
         }
     })
-        .spread((user, created) => {
+        .spread((user) => {
 
             switch (user.role) {
                 case 'user' :
-                    sendCalendarStartDate(ctx);
+                    ctx.reply('Начало оплаты');
                     break;
                 case 'nanny' :
                     ctx.reply('Отлично, мы Вас уведомим, когда Вам поступят заявки');
