@@ -3,7 +3,8 @@ const Telegraf = require('telegraf');
 const Sequelize = require('sequelize');
 const Calendar = require('telegraf-calendar-telegram');
 
-const token = "494928840:AAHD8Aiven5HcWQf-9k2WLQsv5S8WStITi0";
+//const token = "494928840:AAHD8Aiven5HcWQf-9k2WLQsv5S8WStITi0";
+const token = "497454060:AAHiV3SLyh5uNs21ifikpzwfOWMLAyHjfN8";
 
 //const bot = new Telegrambot(token, {polling: true}); telegram-bot-api
 const bot = new Telegraf(token);
@@ -91,6 +92,13 @@ let userOrders = {
             return false;
         }
     },
+    setOrderCity: function (ctx, city = "Astana") {
+        if (userOrders.hasOwnProperty(ctx.update.callback_query.message.chat.id)) {
+            userOrders[ctx.update.callback_query.message.chat.id].city = city;
+        } else {
+            return false;
+        }
+    },
     setOrderDate: function (ctx, date, type = "start") {
         if (userOrders.hasOwnProperty(ctx.update.callback_query.message.chat.id)) {
             userOrders[ctx.update.callback_query.message.chat.id].order[type + 'Date'] = date;
@@ -172,10 +180,10 @@ let userOrders = {
 };
 
 
-let NewNannyOrder = function (city, ctx, phone = null) {
+let NewNannyOrder = function (ctx) {
     this.telegram_id = ctx.update.callback_query.message.chat.id;
-    this.city = city;
-    this.phone = phone;
+    this.city = null;
+    this.phone = null;
     this.nanny_id = null;
     this.saved = false;
     this.offer = null;
@@ -206,6 +214,7 @@ bot.on('callback_query', (ctx) => {
         case "giveNanny" :
             switch (splitData[1]) {
                 case "yes" :
+                    userOrders.setOrder(new NewNannyOrder(ctx));
                     sendOffer(ctx);
                     break;
                 case "no" :
@@ -225,10 +234,10 @@ bot.on('callback_query', (ctx) => {
         case "needCity":
             switch (splitData[1]) {
                 case "Astana":
-                    userOrders.setOrder(new NewNannyOrder("Astana", ctx));
+                    userOrders.setOrderCity(ctx, "Astana");
                     break;
                 case "Almata":
-                    userOrders.setOrder(new NewNannyOrder("Astana", ctx));
+                    userOrders.setOrderCity(ctx, "Almata");
                     break;
             }
             sendOrderDateChooser(ctx, "start");
@@ -263,7 +272,7 @@ bot.on('callback_query', (ctx) => {
 });
 
 function sendOffer(ctx) {
-    deleteMessage(ctx);
+    deleteMessages(ctx);
     return ctx.reply('Перед тем как выбрать няню, просьба ознакомиться с публичной офертой.', {
         "reply_markup": {
             "inline_keyboard": [
@@ -272,35 +281,45 @@ function sendOffer(ctx) {
         }
     }).then(
         result => {
-
+            if(result.message_id) {
+                userOrders.setOrderSendedMessage(ctx, result.message_id);
+            }
         }
     );
 }
 
 function sendQuestionNanny(ctx) {
-    deleteMessage(ctx);
+    deleteMessages(ctx);
     return ctx.reply('Вы няня?.', {
         "reply_markup": {
             "inline_keyboard": [
                 [{text: "Да", callback_data: "iAmNanny_yes"}],
                 [{text: "Нет", callback_data: "iAmNanny_no"}]]
         }
+    }).then(result => {
+        if(result.message_id) {
+            userOrders.setOrderSendedMessage(ctx, result.message_id);
+        }
     });
 }
 
 function sendQuestionCity(ctx) {
-    deleteMessage(ctx);
+    deleteMessages(ctx);
     return ctx.reply('В каком городе вам нужна няня?', {
         "reply_markup": {
             "inline_keyboard": [
                 [{text: "Астана", callback_data: "needCity_Astana"}],
                 [{text: "Алмата", callback_data: "needCity_Almata"}]]
         }
+    }).then(result => {
+        if(result.message_id) {
+            userOrders.setOrderSendedMessage(ctx, result.message_id);
+        }
     });
 }
 
 function sendOrderDateChooser(ctx, type = "start") {
-    deleteMessage(ctx);
+    deleteMessages(ctx);
     let message = null;
     switch (type) {
         case "start":
@@ -312,11 +331,16 @@ function sendOrderDateChooser(ctx, type = "start") {
             break;
     }
     userOrders.setOrderNowType(ctx, type);
-    return ctx.reply(message, calendar.getCalendar());
+    return ctx.reply(message, calendar.getCalendar())
+        .then(result => {
+        if(result.message_id) {
+            userOrders.setOrderSendedMessage(ctx, result.message_id);
+        }
+    });
 }
 
 function sendOrderTimeChooser(ctx, type = "start") {
-    deleteMessage(ctx);
+    deleteMessages(ctx);
     let time = null;
     if (userOrders.getOrderTime(ctx, type)) {
         time = userOrders.getOrderTime(ctx, type);
@@ -346,6 +370,10 @@ function makeDatePicker(ctx, time, type = "start") {
                 ],
                 [{text: "Готово", callback_data: "timePicker_quit_" + type}]
             ]
+        }
+    }).then(result => {
+        if(result.message_id) {
+            userOrders.setOrderSendedMessage(ctx, result.message_id);
         }
     });
 }
@@ -412,7 +440,7 @@ function recalcTimePicker(ctx) {
 }
 
 function sendFreeNannies(ctx) {
-    deleteMessage(ctx);
+    deleteMessages(ctx);
     sequelize.query('' +
         "SELECT nannies.id, nannies.biography, nannies.user_id  FROM nannies " +
         "WHERE NOT EXISTS (" +
@@ -429,9 +457,9 @@ function sendFreeNannies(ctx) {
             if (nannies) {
                 let sended = [];
                 ctx.reply('В выбранное время могут работать следующие няни:').then(
-                    reply => {
-                        if (reply.message_id) {
-                            sended.push(reply.message_id);
+                    result => {
+                        if(result.message_id) {
+                            userOrders.setOrderSendedMessage(ctx, result.message_id);
                         }
                     }
                 );
@@ -443,29 +471,28 @@ function sendFreeNannies(ctx) {
                                 [{text: "Заказать", callback_data: "chooseNanny_" + item.id}]
                             ]
                         }
-                    }).then(reply => {
-                        if (reply.message_id) {
-                            sended.push(reply.message_id);
+                    }).then(result => {
+                        if(result.message_id) {
+                            userOrders.setOrderSendedMessage(ctx, result.message_id);
                         }
                     });
                 });
-                userOrders.setOrderSendedNannies(ctx, sended);
             }
         });
 }
 
 function sentPayment(ctx) {
-    let sendedNannies = userOrders.getOrderSendedNannies(ctx);
-    let ctx_chat_id = ctx.update.callback_query.message.chat.id;
-    sendedNannies.forEach(function(item){
-        bot.telegram.deleteMessage(ctx_chat_id, item);
-    });
+    deleteMessages(ctx);
     ctx.reply('Для того, чтобы забронировать время няни вам необходимо оплатить. Следующие кнопки запросят Ваши контактные данные. Какой способ оплаты удобен для вас?', {
         reply_markup: {
             "one_time_keyboard": true,
             keyboard: [
                 [{text: "Банковской картой", request_contact: true}, {text: "Qiwi терминал", request_contact: true}]
             ]
+        }
+    }).then(result => {
+        if(result.message_id) {
+            userOrders.setOrderSendedMessage(ctx, result.message_id);
         }
     });
 }
@@ -495,7 +522,11 @@ bot.start((ctx) => {
                 [{text: "Да", callback_data: "giveNanny_yes"}],
                 [{text: "Нет", callback_data: "giveNanny_no"}]]
         }
-    })
+    }).then(result => {
+        if(result.message_id) {
+            userOrders.setOrderSendedMessage(ctx, result.message_id);
+        }
+    });
 });
 
 
