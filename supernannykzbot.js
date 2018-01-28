@@ -20,7 +20,7 @@ const calendar = new Calendar(bot, {
 
 const database = "supernanny";
 const user = "root";
-const password = "s12q!Bza";
+const password = "123";
 const host = "localhost";
 
 const sequelize = new Sequelize(database, user, password, {
@@ -66,7 +66,14 @@ const NannyOrders = sequelize.define('nanny_orders', {
     user_id: Sequelize.INTEGER.UNSIGNED,
     nanny_id: Sequelize.INTEGER.UNSIGNED,
     start: Sequelize.DATE,
-    end: Sequelize.DATE
+    end: Sequelize.DATE,
+    is_payed: Sequelize.INTEGER,
+    is_confirmed: Sequelize.INTEGER,
+    created_at: Sequelize.DATE,
+    updated_at: Sequelize.DATE,
+    child_count: Sequelize.INTEGER,
+    child_ages: Sequelize.STRING(20),
+    payed_type: Sequelize.STRING(30)
 });
 
 const Nanny = sequelize.define('nannies', {
@@ -107,18 +114,19 @@ let userSessions = {
         let session = userSessions.getSession(ctx);
         console.log("-------------------");
         console.log(session);
-        if(session){
-            if(
-                session.userId &&
+        if (session) {
+            if (
                 session.telegram_id &&
                 session.city &&
                 session.nanny_id &&
                 session.offer &&
+                session.phone &&
+                session.countChildren &&
+                session.childrenYears &&
                 session.order.startTime &&
                 session.order.endTime &&
                 session.order.startDate &&
-                session.order.endDate)
-            {
+                session.order.endDate) {
                 return true;
             }
         }
@@ -149,20 +157,53 @@ let userSessions = {
             return false;
         }
     },
-    setSessionUserId: function (ctx, userId) {
+    setCountChildren: function (ctx, count = 1) {
         let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
         if (userSessions.hasOwnProperty(chat_id)) {
-            userSessions[chat_id].userId = userId;
+            userSessions[chat_id].countChildren = count;
         } else {
             return false;
         }
     },
-    setSessionContact: function (ctx, userId = null, firstName = null, lastName = null ){
+    getCountChildren: function (ctx) {
+        let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
+        if (userSessions.hasOwnProperty(chat_id)) {
+            return userSessions[chat_id].countChildren;
+        } else {
+            return false;
+        }
+    },
+    setChildYear: function (ctx, year = 0) {
+        let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
+        if (userSessions.hasOwnProperty(chat_id)) {
+            userSessions[chat_id].childrenYears.push(year);
+        } else {
+            return false;
+        }
+    },
+    setSessionContacts: function (ctx, userId = null, firstName = null, lastName = null, phone = null) {
         let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
         if (userSessions.hasOwnProperty(chat_id)) {
             userSessions[chat_id].userId = userId;
             userSessions[chat_id].firstName = firstName;
             userSessions[chat_id].lastName = lastName;
+            userSessions[chat_id].phone = phone;
+        } else {
+            return false;
+        }
+    },
+    getSessionType: function (ctx) {
+        let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
+        if (userSessions.hasOwnProperty(chat_id)) {
+            return userSessions[chat_id].sessionType;
+        } else {
+            return false;
+        }
+    },
+    setSessionType: function (ctx, sessionType = "order") {
+        let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
+        if (userSessions.hasOwnProperty(chat_id)) {
+            userSessions[chat_id].sessionType = sessionType;
         } else {
             return false;
         }
@@ -202,7 +243,7 @@ let userSessions = {
     getOrderFullTime: function (ctx, type = "start") {
         let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
         if (userSessions.hasOwnProperty(chat_id)) {
-            return userSessions[chat_id].order.startDate
+            return userSessions[chat_id].order[type + "Date"]
                 + " " + userSessions[chat_id].order[type + "Time"] + ":00";
         } else {
             return false;
@@ -265,12 +306,15 @@ let NewUserSession = function (ctx) {
     this.userId = null;
     this.firstName = null;
     this.lastName = null;
+    this.phone = null;
     this.city = null;
     this.offer = null;
     this.nanny_id = null;
     this.saved = false;
     this.sendedMessages = [];
-    this.typeSession = null;
+    this.countChildren = null;
+    this.childrenYears = [];
+    this.sessionType = null;
     this.order = {
         startDate: null,
         endDate: null,
@@ -290,19 +334,21 @@ bot.hears('📜 Главное меню', (ctx) => {
     sendMenu(ctx);
 });
 
-function sendMenu(ctx){
-    return ctx.reply('Главное меню', {
-        "reply_markup": {
-            resize_keyboard: true,
-            keyboard: [
-                [{text:"Мои заказы"}, {text:"Заказать няню"}],
-                [{text: "Контакты"}]
-            ]
-        }
-    })
+let mainMenuKeyboard = {
+    "reply_markup": {
+        resize_keyboard: true,
+        keyboard: [
+            [{text: "🗓 Мои заказы"}, {text: "🕰 Заказать няню"}],
+            [{text: "👩‍👦‍👦 Для няни"}, {text: "☎️ Контакты"}]
+        ]
+    }
+};
+
+function sendMenu(ctx) {
+    return ctx.reply('📜 Главное меню', mainMenuKeyboard);
 }
 
-bot.hears('Заказать няню', (ctx) => {
+bot.hears('🕰 Заказать няню', (ctx) => {
     userSessions.deleteSessionMessages(ctx);
     return ctx.reply('Здесь вы можете выбрать и пригласить бебиситтера с сервиса почасовых супернянь для своего' +
         ' ребенка от 0 до 10 лет. Наши суперняни отобраны, обучены, прошли медосмотр. Чтобы сделать заказ ' +
@@ -310,54 +356,55 @@ bot.hears('Заказать няню', (ctx) => {
         reply_markup: {
             resize_keyboard: true,
             keyboard: [
-                [{text: "👤 Поделиться контактными данными", request_contact:true}],
+                [{text: "👤 Поделиться контактными данными", request_contact: true}],
                 [{text: "📜 Главное меню"}]]
         }
     }).then(result => {
         if (result.message_id) {
             userSessions.setNewSession(ctx, new NewUserSession(ctx));
             userSessions.setSessionSendedMessage(ctx, result.message_id);
+            userSessions.setSessionType(ctx, "order");
         }
     });
 });
 
-bot.hears('Контакты', (ctx) => {
+bot.hears('☎️ Контакты', (ctx) => {
     userSessions.deleteSessionMessages(ctx);
+    userSessions.setNewSession(ctx, new NewUserSession(ctx));
     return ctx.reply('Наши контакты: \nEmail:info@supernanny.kz');
 });
 
-bot.hears('Мои заказы', (ctx) => {
+bot.hears('👩‍👦‍👦 Для няни', (ctx) => {
     userSessions.deleteSessionMessages(ctx);
-    return ctx.reply('Список Ваших заказов пуст!');
-});
-
-
-
-
-
-function restart(ctx){
-    return ctx.reply('Здесь вы можете выбрать и пригласить бебиситтера с сервиса почасовых супернянь для своего' +
-        ' ребенка от 0 до 10 лет. Наши суперняни отобраны, обучены, прошли медосмотр. Вы хотите пригласить почасовую суперняню?', {
-        "reply_markup": {
-            "inline_keyboard": [
-                [{text: "Да", callback_data: "giveNanny_yes"}],
-                [{text: "Нет", callback_data: "giveNanny_no"}]]
+    userSessions.setNewSession(ctx, new NewUserSession(ctx));
+    return ctx.reply('Если Вы почасовая няня с сайта http://supernanny.kz, пожалуйста, поделитесь ' +
+        'контактным данными, чтобы мы записали Вас в систему уведомлений.', {
+        reply_markup: {
+            resize_keyboard: true,
+            keyboard: [
+                [{text: "👤 Поделиться контактными данными", request_contact: true}],
+                [{text: "📜 Главное меню"}]]
         }
     }).then(result => {
         if (result.message_id) {
-            userSessions.setNewSession(ctx, new NewUserSession(ctx));
             userSessions.setSessionSendedMessage(ctx, result.message_id);
+            userSessions.setSessionType(ctx, "remember_nanny_telegram");
         }
     });
-}
+});
 
-function exit(ctx){
+bot.hears('🗓 Мои заказы', (ctx) => {
+    userSessions.deleteSessionMessages(ctx);
+    userSessions.setNewSession(ctx, new NewUserSession(ctx));
+    return ctx.reply('Список Ваших заказов пуст!');
+});
+
+function exit(ctx) {
     userSessions.deleteSessionMessages(ctx);
     userSessions.deleteSession(ctx);
 }
 
 bot.hears('Отмена', (ctx) => sendQuestionRestart(ctx));
-
 
 calendar.setDateListener((ctx, calDate) => {
     let type = userSessions.getOrderNowType(ctx);
@@ -367,83 +414,57 @@ calendar.setDateListener((ctx, calDate) => {
 
 
 bot.on('contact', (ctx) => {
+
     userSessions.deleteSessionMessages(ctx);
     let phone = ctx.message.contact.phone_number.substr(ctx.message.contact.phone_number.length - 10);
+    let name = (ctx.message.contact.first_name) ? ctx.message.contact.first_name : null;
+    let lastName = (ctx.message.contact.last_name) ? ctx.message.contact.last_name : null;
 
-    //Записываем в базу контакты как начавший предварительно заказ
-
-    User.findOrCreate({
-        where: {
-            phone: {
-                [Op.like]: '%' + phone
-            }
-        },
-        defaults: {
-            phone: "+7" + phone,
-            role: "user",
-            name: (ctx.message.contact.first_name) ? ctx.message.contact.first_name : "",
-            lastname: (ctx.message.contact.last_name) ? ctx.message.contact.last_name : "",
-            telegram_id: ctx.message.chat.id,
-            created_at: new Date(),
-            updated_at: new Date(),
-        }
-    })
-        .spread((user) => {
-            switch (user.role) {
-                case 'user' :
-                    userSessions.setSessionUserId(ctx, user.id);
-                    console.log(userSessions);
-                    if(userSessions.testSession(ctx))
-                    {
-                        ctx.reply('Отлично. Какой способ оплаты для Вас удобнее?', {
-                            reply_markup: {
-                                inline_keyboard: [
-                                    [{text: "Банковской картой внутри телеграма", callback_data: "payment_wall"}],
-                                    [{text: "QIWI терминал", callback_data: "payment_qiwi"}]
-                                ]
-                            }
-                        }).then(result => {
-                            if (result.message_id) {
-                                userSessions.setSessionSendedMessage(ctx, result.message_id);
-                            }
-                        });
-                    }else{
-                        ctx.reply('К сожалению, Вы не являетесь зарегистрированной няней в нашей системе.', {
-                            reply_markup: {
-                                inline_keyboard: [
-                                    [{text: "Начать с начала", callback_data: "restart"}],
-                                    [{text: "Выйти", callback_data: "byeBye"}]
-                                ]
-                            }
-                        }).then(result => {
-                            if (result.message_id) {
-                                userSessions.setSessionSendedMessage(ctx, result.message_id);
-                            }
-                        });
+    switch (userSessions.getSessionType(ctx)) {
+        case "order":
+            userSessions.setSessionContacts(ctx, null, name, lastName, phone);
+            sendOffer(ctx);
+            break;
+        case "remember_nanny_telegram":
+            User.findOne({
+                where: {
+                    phone: {
+                        [Op.like]: '%' + phone
                     }
-                    break;
-                case 'nanny' :
-                    ctx.reply('Отлично. Ваша роль на сайте - няня. Я Вас уведомлю при оформлении заказа и за 1 час до начала!');
-                    break;
-                case 'admin' :
-                    ctx.reply('Ваша роль на сайте - администратор. ');
-                    break;
-            }
-            let needSave = false;
-            if (!user.telegram_id) {
-                user.telegram_id = ctx.message.chat.id;
-                needSave = true;
-            }
-            if (!user.name) {
-                user.name = (ctx.message.contact.first_name) ? ctx.message.contact.first_name : "";
-                needSave = true;
-            }
-            if (!user.lastname) {
-                user.lastname = (ctx.message.contact.last_name) ? ctx.message.contact.last_name : "";
-                needSave = true;
-            }
-            if (needSave) user.save();
-        });
+                }
+            }).then(user => {
+                let returnMessage = null;
+                if (user) {
+                    switch (user.role) {
+                        case "nanny":
+                            if (!user.telegram_id) {
+                                user.telegram_id = ctx.message.chat.id;
+                                user.save();
+                                returnMessage = 'Отлично. Я Вас уведомлю при оформлении заказа и за 1 час до начала!';
+                            } else {
+                                returnMessage = 'Ваш контакт уже сохранен. Я Вас уведомлю при оформлении заказа и за 1 час до начала!';
+                            }
+                            break;
+                        default :
+                            returnMessage = 'Ваш профиль на сайте http://supernanny.kz не соотвествует необходимой роли';
+                    }
+                } else {
+                    returnMessage = 'Вы незарегистрированный пользователь на сайте http://supernanny.kz';
+                }
+                ctx.reply(returnMessage, {
+                    "reply_markup": {
+                        resize_keyboard: true,
+                        keyboard: [
+                            [{text: "🗓 Мои заказы"}, {text: "🕰 Заказать няню"}],
+                            [{text: "👩‍👦‍👦 Для няни"}, {text: "☎️ Контакты"}]
+                        ]
+                    }
+                });
+            });
+            break;
+        default :
+            console.log('asdasd');
+    }
 });
 
 bot.on('callback_query', (ctx) => {
@@ -451,26 +472,6 @@ bot.on('callback_query', (ctx) => {
     let cData = ctx.update.callback_query.data;
     let splitData = cData.split('_');
     switch (splitData[0]) {
-        case "giveNanny" :
-            switch (splitData[1]) {
-                case "yes" :
-                    sendOffer(ctx);
-                    break;
-                case "no" :
-                    sendQuestionNanny(ctx);
-                    break;
-            }
-            break;
-        case "iAmNanny":
-            switch (splitData[1]){
-                case "yes":
-                    sendNannyGiveContact(ctx);
-                    break;
-                case "no":
-                    sendQuestionRestart(ctx);
-                    break;
-            }
-            break;
         case "offer" :
             switch (splitData[1]) {
                 case "yes":
@@ -492,7 +493,23 @@ bot.on('callback_query', (ctx) => {
                     userSessions.setSessionCity(ctx, "Almata");
                     break;
             }
-            sendOrderDateChooser(ctx, "start");
+            sendChildCountChooser(ctx);
+            break;
+
+        case "countChildren":
+            userSessions.setCountChildren(ctx, +splitData[1]);
+            sendChildYears(ctx, +splitData[1], 0);
+            break;
+
+        case "yearChild":
+            let count = userSessions.getCountChildren(ctx);
+            userSessions.setChildYear(ctx, +splitData[2]);
+            if (splitData[1] == count) {
+                console.log(userSessions);
+                sendOrderDateChooser(ctx, "start");
+            } else {
+                sendChildYears(ctx, count, +splitData[1]);
+            }
             break;
 
         case "timePicker":
@@ -507,7 +524,6 @@ bot.on('callback_query', (ctx) => {
                         } else {
                             sendOrderDateChooser(ctx, "start", "Выбрано некорректное время!");
                         }
-
                         break;
                     case "end":
                         if (testTime(ctx)) {
@@ -521,15 +537,35 @@ bot.on('callback_query', (ctx) => {
 
         case "chooseNanny":
             userSessions.setOrderNanny(ctx, splitData[1]);
-            sendShareContact(ctx);
+            console.log(userSessions);
+            if (userSessions.testSession(ctx)) {
+                sentPayment(ctx);
+            } else {
+                console.log("testSessionFalse");
+            }
+            break;
+
+        case "payment":
+            switch (splitData[1]) {
+                case "bankCard":
+                    break;
+                case "qiwi":
+                    saveQiwiOrder(ctx);
+                    break;
+            }
             break;
 
         case "restart":
-            restart(ctx);
+            switch (splitData[1]) {
+                case "sendOffer":
+                    sendOffer(ctx);
+                    break;
+            }
             break;
 
-        case "byeBye":
-            exit(ctx);
+        case "mainMenu":
+            userSessions.deleteSessionMessages(ctx);
+            sendMenu(ctx);
             break;
 
         default:
@@ -571,16 +607,8 @@ function testTime(ctx) {
 
 }
 
-
-function sendOffer(ctx) {
-    userSessions.deleteSessionMessages(ctx);
-    return ctx.reply('Перед тем как выбрать няню, просьба ознакомиться с публичной офертой.', {
-        "reply_markup": {
-            "inline_keyboard": [
-                [{text: "Прочитал", callback_data: "offer_yes"}],
-                [{text: "Отмена", callback_data: "offer_no"}]]
-        }
-    }).then(
+function addMainMenu(ctx, message = "No message") {
+    return ctx.reply(message, mainMenuKeyboard).then(
         result => {
             if (result.message_id) {
                 userSessions.setSessionSendedMessage(ctx, result.message_id);
@@ -589,21 +617,42 @@ function sendOffer(ctx) {
     );
 }
 
+function sendOffer(ctx) {
+    userSessions.deleteSessionMessages(ctx);
+    addMainMenu(ctx, "Шаг № 1").then(result => {
+        ctx.reply('Перед тем как выбрать няню, необходимо принять условия публичной оферты.', {
+            reply_markup: {
+                inline_keyboard: [
+                    [{text: "Принимаю", callback_data: "offer_yes"}],
+                    [{text: "Не принимаю", callback_data: "offer_no"}]]
+            }
+        }).then(
+            result => {
+                if (result.message_id) {
+                    userSessions.setSessionSendedMessage(ctx, result.message_id);
+                }
+            }
+        );
+    });
+
+}
+
 function sendNeedToAccessOffer(ctx) {
     userSessions.deleteSessionMessages(ctx);
-    return ctx.reply('К сожалению, чтобы воспользоваться нашим сервисом Вы должны принять условия оферты.', {
-        "reply_markup": {
-            "inline_keyboard": [
-                [{text: "Начать с начала", callback_data: "restart"}],
-                [{text: "Выйти", callback_data: "byeBye"}]]
-        }
-    }).then(
-        result => {
-            if (result.message_id) {
-                userSessions.setSessionSendedMessage(ctx, result.message_id);
+    addMainMenu(ctx, "Отмена правил оферты:").then(result => {
+        ctx.reply('К сожалению, чтобы воспользоваться нашим сервисом Вы должны принять условия оферты.', {
+            "reply_markup": {
+                "inline_keyboard": [
+                    [{text: "🕰 Начать заказ с начала", callback_data: "restart_sendOffer"}]]
             }
-        }
-    );
+        }).then(
+            result => {
+                if (result.message_id) {
+                    userSessions.setSessionSendedMessage(ctx, result.message_id);
+                }
+            }
+        );
+    });
 }
 
 function sendQuestionNanny(ctx) {
@@ -620,7 +669,8 @@ function sendQuestionNanny(ctx) {
         }
     });
 }
-function sendNannyGiveContact(ctx){
+
+function sendNannyGiveContact(ctx) {
     userSessions.deleteSessionMessages(ctx);
     return ctx.reply('Отлично. Следующая кнопка запросит Ваши контактные данные, чтобы завершить регистрацию в боте и отсылать Вам уведомления о заказах.', {
         one_time_keyboard: true,
@@ -654,17 +704,92 @@ function sendQuestionRestart(ctx) {
 
 function sendQuestionCity(ctx) {
     userSessions.deleteSessionMessages(ctx);
-    return ctx.reply('В каком городе вам нужна няня?', {
-        "reply_markup": {
-            "inline_keyboard": [
-                [{text: "Астана", callback_data: "needCity_Astana"}],
-                [{text: "Алмата", callback_data: "needCity_Almata"}]]
-        }
-    }).then(result => {
-        if (result.message_id) {
-            userSessions.setSessionSendedMessage(ctx, result.message_id);
-        }
+    addMainMenu(ctx, "Шаг № 2").then(result => {
+        ctx.reply('В каком городе вам нужна няня?', {
+            "reply_markup": {
+                "inline_keyboard": [
+                    [{text: "Астана", callback_data: "needCity_Astana"}],
+                    [{text: "Алмата", callback_data: "needCity_Almata"}]]
+            }
+        }).then(result => {
+            if (result.message_id) {
+                userSessions.setSessionSendedMessage(ctx, result.message_id);
+            }
+        });
     });
+}
+
+function sendChildCountChooser(ctx) {
+    userSessions.deleteSessionMessages(ctx);
+    addMainMenu(ctx, "Шаг № 3").then(result => {
+        ctx.reply('Для какого количества детей Вам нужна няня?', {
+            "reply_markup": {
+                "inline_keyboard": [
+                    [{text: "1", callback_data: "countChildren_1"}],
+                    [{text: "2", callback_data: "countChildren_2"}],
+                    [{text: "3", callback_data: "countChildren_3"}]
+                ],
+            }
+        }).then(result => {
+            if (result.message_id) {
+                userSessions.setSessionSendedMessage(ctx, result.message_id);
+            }
+        });
+    });
+}
+
+function sendChildYears(ctx, countChildren = 1, childChoosed = 0) {
+    userSessions.deleteSessionMessages(ctx);
+    console.log();
+    let nowChildChoos = childChoosed + 1;
+    console.log(nowChildChoos);
+    let message = (countChildren > 1) ? "Шаг № 4 (Ребенок № " + nowChildChoos + ")" : "Шаг № 4 ";
+    let nameChild = "";
+    switch (nowChildChoos) {
+        case 1:
+            if (countChildren > 1) {
+                nameChild = "первого ";
+            } else {
+                nameChild = "";
+            }
+            break;
+        case 2:
+            nameChild = "второго ";
+            break;
+        case 3:
+            nameChild = "третьего ";
+            break;
+    }
+
+    if (childChoosed < countChildren) {
+        addMainMenu(ctx, message).then(result => {
+            ctx.reply('Выберите возвраст ' + nameChild + "ребенка", {
+                "reply_markup": {
+                    "inline_keyboard": [
+                        [
+                            {text: "0", callback_data: "yearChild_" + nowChildChoos + "_" + "0"},
+                            {text: "1", callback_data: "yearChild_" + nowChildChoos + "_" + "1"},
+                            {text: "2", callback_data: "yearChild_" + nowChildChoos + "_" + "2"},
+                            {text: "3", callback_data: "yearChild_" + nowChildChoos + "_" + "3"},
+                            {text: "4", callback_data: "yearChild_" + nowChildChoos + "_" + "4"},
+                            {text: "5", callback_data: "yearChild_" + nowChildChoos + "_" + "5"},
+                        ],
+                        [
+                            {text: "6", callback_data: "yearChild_" + nowChildChoos + "_" + "6"},
+                            {text: "7", callback_data: "yearChild_" + nowChildChoos + "_" + "7"},
+                            {text: "8", callback_data: "yearChild_" + nowChildChoos + "_" + "8"},
+                            {text: "9", callback_data: "yearChild_" + nowChildChoos + "_" + "9"},
+                            {text: "10", callback_data: "yearChild_" + nowChildChoos + "_" + "10"}
+                        ]
+                    ],
+                }
+            }).then(result => {
+                if (result.message_id) {
+                    userSessions.setSessionSendedMessage(ctx, result.message_id);
+                }
+            });
+        });
+    }
 }
 
 function sendOrderDateChooser(ctx, type = "start", error = "") {
@@ -685,12 +810,16 @@ function sendOrderDateChooser(ctx, type = "start", error = "") {
         let newError = "Ошибка: " + error + "\n";
         message = newError + message;
     }
-    return ctx.reply(message, calendar.getCalendar())
-        .then(result => {
-            if (result.message_id) {
-                userSessions.setSessionSendedMessage(ctx, result.message_id);
-            }
-        });
+    let step = (type === "start") ? "5" : "7";
+    addMainMenu(ctx, "Шаг № " + step).then(result => {
+        ctx.reply(message, calendar.getCalendar())
+            .then(result => {
+                if (result.message_id) {
+                    userSessions.setSessionSendedMessage(ctx, result.message_id);
+                }
+            });
+    });
+
 }
 
 function sendOrderTimeChooser(ctx, type = "start") {
@@ -709,26 +838,28 @@ function makeDatePicker(ctx, time, type = "start") {
 
     let val = (type === "start") ? "timePicker_start" : "timePicker_end";
     let text = (type === "start") ? 'Задайте начальное время брони' : 'Задайте конечное время брони';
-
-    return ctx.reply(text, {
-        "reply_markup": {
-            "inline_keyboard": [
-                [
-                    {text: " - 1 час", callback_data: val + "_minus_chas"},
-                    {text: time, callback_data: "timePicker_quit_" + type},
-                    {text: " + 1 час", callback_data: val + "_plus_chas"}
-                ],
-                [
-                    {text: " - 30 мин", callback_data: val + "_minus_30min"},
-                    {text: " + 30 мин", callback_data: val + "_plus_30min"}
-                ],
-                [{text: "Готово", callback_data: "timePicker_quit_" + type}]
-            ]
-        }
-    }).then(result => {
-        if (result.message_id) {
-            userSessions.setSessionSendedMessage(ctx, result.message_id);
-        }
+    let step = (type === "start") ? "6" : "8";
+    addMainMenu(ctx, "Шаг № " + step).then(result => {
+        ctx.reply(text, {
+            "reply_markup": {
+                "inline_keyboard": [
+                    [
+                        {text: " - 1 час", callback_data: val + "_minus_chas"},
+                        {text: time, callback_data: "timePicker_quit_" + type},
+                        {text: " + 1 час", callback_data: val + "_plus_chas"}
+                    ],
+                    [
+                        {text: " - 30 мин", callback_data: val + "_minus_30min"},
+                        {text: " + 30 мин", callback_data: val + "_plus_30min"}
+                    ],
+                    [{text: "Готово", callback_data: "timePicker_quit_" + type}]
+                ]
+            }
+        }).then(result => {
+            if (result.message_id) {
+                userSessions.setSessionSendedMessage(ctx, result.message_id);
+            }
+        });
     });
 }
 
@@ -809,67 +940,107 @@ function sendFreeNannies(ctx) {
         "LIMIT 3 ")
         .then(nannies => {
             if (nannies) {
-                ctx.reply('В выбранное время могут работать следующие няни:').then(
-                    result => {
-                        if (result.message_id) {
-                            userSessions.setSessionSendedMessage(ctx, result.message_id);
+                addMainMenu(ctx, "Шаг № 9").then(result => {
+                    ctx.reply('В выбранное время могут работать следующие няни:').then(
+                        result => {
+                            if (result.message_id) {
+                                userSessions.setSessionSendedMessage(ctx, result.message_id);
+                            }
                         }
-                    }
-                );
-                nannies[0].forEach(function (item) {
-                    ctx.replyWithPhoto({source: "image.jpeg"}, {
-                        caption: item.biography.substr(0, 197) + "...",
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{text: "Заказать", callback_data: "chooseNanny_" + item.id}]
-                            ]
-                        }
-                    }).then(result => {
-                        if (result.message_id) {
-                            userSessions.setSessionSendedMessage(ctx, result.message_id);
-                        }
+                    );
+                    nannies[0].forEach(function (item) {
+                        ctx.replyWithPhoto({source: "image.jpeg"}, {
+                            caption: item.biography.substr(0, 197) + "...",
+                            reply_markup: {
+                                inline_keyboard: [
+                                    [{text: "Заказать", callback_data: "chooseNanny_" + item.id}]
+                                ]
+                            }
+                        }).then(result => {
+                            if (result.message_id) {
+                                userSessions.setSessionSendedMessage(ctx, result.message_id);
+                            }
+                        });
                     });
                 });
             }
         });
 }
 
-function sendShareContact(ctx) {
-    console.log(userSessions);
-    userSessions.deleteSessionMessages(ctx);
-    ctx.reply('Для того, чтобы забронировать время няни Вам необходимо пройти регистрацию и оплатить.  Cледующая кнопка запросит Ваши контактные данные для регистрации в нашей системе.', {
-        reply_markup: {
-            "one_time_keyboard": true,
-            keyboard: [
-                [{text: "Поделиться контактными данными", request_contact: true}, {text: "Отмена"}]
-            ]
-        }
-    }).then(result => {
-        if (result.message_id) {
-            userSessions.setSessionSendedMessage(ctx, result.message_id);
-        }
-    });
-}
 
 function sentPayment(ctx) {
     userSessions.deleteSessionMessages(ctx);
-    ctx.reply('Для того, чтобы забронировать время няни вам необходимо оплатить. Следующие кнопки запросят Ваши контактные данные. Какой способ оплаты удобен для вас?', {
-        reply_markup: {
-            "one_time_keyboard": true,
-            keyboard: [
-                [{text: "Банковской картой", request_contact: true}, {text: "Qiwi терминал", request_contact: true}]
-            ]
-        }
-    }).then(result => {
-        if (result.message_id) {
-            userSessions.setSessionSendedMessage(ctx, result.message_id);
-        }
+    addMainMenu(ctx, 'Шаг № 10').then(result => {
+        ctx.reply('Выберите удобный для Вас способ оплаты', {
+            reply_markup: {
+                inline_keyboard: [
+                    [
+                        {text: "Банковской картой", callback_data: "payment_bankCard"},
+                        {text: "Qiwi терминал", callback_data: "payment_qiwi"}
+                    ]
+                ]
+            }
+        }).then(result => {
+            if (result.message_id) {
+                userSessions.setSessionSendedMessage(ctx, result.message_id);
+            }
+        });
     });
 }
 
+function saveQiwiOrder(ctx) {
+    userSessions.deleteSessionMessages(ctx);
+    let session = userSessions.getSession(ctx);
+    console.log(session);
+    User.findOrCreate({
+        where: {
+                phone: {
+                    [Op.like]: '%' + session.phone
+                }
+            },
+        defaults: {
+                phone: "+7" + session.phone,
+                name: (session.firstName) ? session.firstName : "",
+                lastname: (session.lastName) ? session.lastName : "",
+                role: 'user',
+                created_at: new Date(),
+                updated_at: new Date(),
+                telegram_id: session.telegram_id
+            }
+    })
+        .spread((user) => {
+            if(user){
+                let ages = "";
+                session.childrenYears.forEach(function(item){
+                    if(ages === ""){
+                        ages = item;
+                    }else{
+                        ages = ages + "," + item;
+                    }
+                });
+                NannyOrders.create({
+                    user_id: user.id,
+                    nanny_id: session.nanny_id,
+                    start: userSessions.getOrderFullTime(ctx, "start"),
+                    end: userSessions.getOrderFullTime(ctx, "end"),
+                    is_confirmed: 0,
+                    is_payed: 0,
+                    created_at: new Date(),
+                    updated_at: new Date(),
+                    child_count: session.countChildren,
+                    child_ages: ages,
+                    payed_type: "qiwi"
+                }).then(order=> {
+                    console.log(order);
+                    ctx.reply('Ваш заказ сохранен. но еще не оплачен.\nСумма к оплате: ***\n' +
+                        'Инструкция к оплате...\n' +
+                        'Для просмотра своих заказов нажмите кнопку "🗓 Мои заказы"', mainMenuKeyboard);
+                    ctx.setSessionType(ctx, null);
+                });
+            }
+        });
 
-
-
+}
 
 bot.startPolling();
 
