@@ -9,6 +9,7 @@
   "author": "OTgroup",
   "license": "ISC",
   "dependencies": {
+    "moment": "^2.20.1",
     "mysql2": "^1.5.1",
     "sequelize": "^4.31.2",
     "telegraf": "^3.17.5",
