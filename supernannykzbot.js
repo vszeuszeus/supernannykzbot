@@ -854,8 +854,13 @@ function makeDatePicker(ctx, time, type = "start") {
             "reply_markup": {
                 "inline_keyboard": [
                     [
+                        {text: " - 3 часа", callback_data: val + "_minus_3chas"},
+                        {text: time, callback_data: "not_action"},
+                        {text: " + 3 часа", callback_data: val + "_plus_3chas"}
+
+                    ],
+                    [
                         {text: " - 1 час", callback_data: val + "_minus_chas"},
-                        {text: time, callback_data: "timePicker_quit_" + type},
                         {text: " + 1 час", callback_data: val + "_plus_chas"}
                     ],
                     [
@@ -884,6 +889,12 @@ function recalcTimePicker(ctx) {
     switch (splitData[2]) {
         case "minus":
             switch (splitData[3]) {
+                case "3chas":
+                    hoursSplit = +hoursSplit - 3;
+                    if(hoursSplit < 0){
+                        hoursSplit = 24 + hoursSplit; //+ потому что - и - дают плюс а число с минусом поэтому ставим плюс
+                    }
+                    break;
                 case "chas":
                     if (hoursSplit === "00" || hoursSplit === "0") {
                         hoursSplit = "23";
@@ -907,6 +918,13 @@ function recalcTimePicker(ctx) {
             break;
         case "plus" :
             switch (splitData[3]) {
+                case "3chas":
+                    hoursSplit = +hoursSplit + 3;
+                    if(hoursSplit === 24) hoursSplit = "00";
+                    if(hoursSplit > 24){
+                        hoursSplit = +hoursSplit - 24;
+                    }
+                    break;
                 case "chas":
                     if (hoursSplit === "23") {
                         hoursSplit = "00";
