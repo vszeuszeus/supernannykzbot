@@ -87,7 +87,8 @@ const NannyOrders = sequelize.define('nanny_orders', {
     updated_at: Sequelize.DATE,
     child_count: Sequelize.INTEGER,
     child_ages: Sequelize.STRING(20),
-    payed_type: Sequelize.STRING(30)
+    payed_type: Sequelize.STRING(30),
+    amount: Sequelize.INTEGER
 });
 
 const Nanny = sequelize.define('nannies', {
@@ -322,6 +323,7 @@ let NewUserSession = function (ctx) {
     this.lastName = null;
     this.phone = null;
     this.city = null;
+    this.amount = 100;
     this.offer = null;
     this.nanny_id = null;
     this.saved = false;
@@ -591,9 +593,10 @@ bot.on('callback_query', (ctx) => {
         case "payment":
             switch (splitData[1]) {
                 case "bankCard":
+                    saveOrderStartPay(ctx, "epay");
                     break;
                 case "qiwi":
-                    saveQiwiOrder(ctx);
+                    saveOrderStartPay(ctx, "qiwi");
                     break;
             }
             break;
@@ -1015,8 +1018,7 @@ function sentPayment(ctx) {
         });
     });
 }
-
-function saveQiwiOrder(ctx) {
+function saveOrderStartPay(ctx, type){
     userSessions.deleteSessionMessages(ctx);
     let session = userSessions.getSession(ctx);
     User.findOrCreate({
@@ -1034,35 +1036,45 @@ function saveQiwiOrder(ctx) {
             updated_at: new Date(),
             telegram_id: session.telegram_id
         }
-    })
-        .spread((user) => {
-            if (user) {
-                let ages = "";
-                session.childrenYears.forEach(function (item) {
-                    if (ages === "") {
-                        ages = item;
-                    } else {
-                        ages = ages + "," + item;
-                    }
-                });
+    }).spread((user) => {
+        if (user) {
+            let ages = "";
+            session.childrenYears.forEach(function (item) {
+                if (ages === "") {
+                    ages = item;
+                } else {
+                    ages = ages + "," + item;
+                }
+            });
 
-                NannyOrders.create({
-                    user_id: user.id,
-                    nanny_id: session.nanny_id,
-                    start: moment(userSessions.getOrderFullTime(ctx, "start")),
-                    end: moment(userSessions.getOrderFullTime(ctx, "end")),
-                    is_confirmed: 0,
-                    is_payed: 0,
-                    created_at: moment().utcOffset(360),
-                    updated_at: moment().utcOffset(360),
-                    child_count: session.countChildren,
-                    child_ages: ages,
-                    payed_type: "qiwi"
-                }).then(order => {
-                    console.log(order);
-                    ctx.reply('Ваш заказ сохранен. но еще не оплачен.\n<b>Сумма к оплате:</b> ***\n' +
-                        'Инструкция к оплате...\n' +
-                        'Для просмотра своих заказов нажмите кнопку: \n"🗓 Мои заказы"', {
+            NannyOrders.create({
+                user_id: user.id,
+                nanny_id: session.nanny_id,
+                start: moment(userSessions.getOrderFullTime(ctx, "start")),
+                end: moment(userSessions.getOrderFullTime(ctx, "end")),
+                is_confirmed: 0,
+                is_payed: 0,
+                created_at: moment().utcOffset(360),
+                updated_at: moment().utcOffset(360),
+                child_count: session.countChildren,
+                child_ages: ages,
+                amount: session.amount,
+                payed_type: type
+            }).then(order => {
+                console.log(order);
+                if(order){
+                    let systemTypeM = (type === "qiwi") ? "QIWI терминал" : "банковская карта";
+                    let message = 'Ваш заказ № <b>' + order.id + '</b> сохранен, но не оплачен.\n' +
+                        '<b>Сумма к оплате:</b> ' + order.amount + '\n' +
+                        '<b>Начало:</b> ' + moment(order.start).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
+                        '<b>Конец:</b> ' + moment(order.end).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
+                        '<b>Количество детей:</b> ' + order.child_count + '\n' +
+                        '<b>Система оплаты:</b> ' + systemTypeM + '\n';
+                    let howPayMessage = (type === "qiwi") ? "Инструкция к оплате...\n" : "Для продолжения оплаты перейдите по ссылке: http://supernanny.kz" +
+                        "/payments/telegram/payOrder?phone=" + session.phone + "&order=" + order.id + " \n";
+                    let postMessage = "Для просмотра своих заказов нажмите кнопку:\n \"🗓 Мои заказы\"";
+                    message = message + howPayMessage + postMessage;
+                    ctx.reply(message, {
                         parse_mode: "HTML",
                         reply_markup: {
                             resize_keyboard: true,
@@ -1073,10 +1085,12 @@ function saveQiwiOrder(ctx) {
                         }
                     });
                     userSessions.setSessionType(ctx, null);
-                });
-            }
-        });
-
+                }
+            });
+        }
+    });
 }
+
+
 
 bot.startPolling();
