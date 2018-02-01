@@ -1094,6 +1094,20 @@ function saveOrderStartPay(ctx, type){
                     userSessions.setSessionType(ctx, null);
                 }
             });
+            let need_save = false;
+            if(!user.telegram_id){
+                user.telegram_id = session.telegram_id;
+                need_save = true;
+            }
+            if(!user.name){
+                user.name = (session.firstName) ? session.firstName : "";
+                need_save = true;
+            }
+            if(!user.lastname){
+                user.lastname = (session.lastname) ? session.lastname : "";
+                need_save = true;
+            }
+            if(need_save) {user.save();}
         }
     });
 }
