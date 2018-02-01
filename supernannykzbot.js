@@ -31,15 +31,20 @@ const calendar = new Calendar(bot, {
     ]
 });
 
-const database = "supernanny";
+/*const database = "supernanny";
 const user = "root";
 const password = "s12q!Bza";
+const host = "localhost";*/
+
+const database = "supernanny";
+const user = "supernannydb";
+const password = "93TntM9aWgWM3NDVBqoW";
 const host = "localhost";
 
 const sequelize = new Sequelize(database, user, password, {
     timezone: "+06:00",
     host: host,
-    port: 3306,
+    port: 3310,
     dialect: 'mysql',
     pool: {
         max: 20,
