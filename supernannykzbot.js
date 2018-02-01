@@ -73,7 +73,7 @@ const User = sequelize.define('users', {
 const NannyOrders = sequelize.define('nanny_orders', {
     id:
         {
-            type: Sequelize.INTEGER,
+            type: Sequelize.BIGINT,
             primaryKey: true,
             autoIncrement: true
         },
