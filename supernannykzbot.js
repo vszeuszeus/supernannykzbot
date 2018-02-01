@@ -423,6 +423,7 @@ bot.hears('🗓 Мои заказы', (ctx) => {
         }
     }).then(user => {
         if (user) {
+            console.log(user);
             NannyOrders.findAll({
                 where: {
                     user_id: user.id
@@ -449,6 +450,7 @@ bot.hears('🗓 Мои заказы', (ctx) => {
                 }
             });
         } else {
+            console.log(user);
             ctx.reply('<b>Список Ваших заказов пуст!</b>', {
                 parse_mode: "HTML"
             });
@@ -1076,7 +1078,7 @@ function saveOrderStartPay(ctx, type){
                         '<b>Количество детей:</b> ' + order.child_count + '\n' +
                         '<b>Система оплаты:</b> ' + systemTypeM + '\n';
                     let howPayMessage = (type === "qiwi") ? "Инструкция к оплате...\n" : "Для продолжения оплаты перейдите по ссылке: http://supernanny.kz" +
-                        "/payments/telegram/payOrder?phone=" + session.phone + "&order=" + order.id + " \n";
+                        "/payments/telegram/payorder?phone=" + session.phone + "&order=" + order.id + " \n";
                     let postMessage = "Для просмотра своих заказов нажмите кнопку:\n \"🗓 Мои заказы\"";
                     message = message + howPayMessage + postMessage;
                     ctx.reply(message, {
