@@ -93,7 +93,8 @@ const NannyOrders = sequelize.define('nanny_orders', {
     child_count: Sequelize.INTEGER,
     child_ages: Sequelize.STRING(20),
     payed_type: Sequelize.STRING(30),
-    amount: Sequelize.INTEGER
+    amount: Sequelize.INTEGER,
+    order_id: Sequelize.INTEGER
 });
 
 const Nanny = sequelize.define('nannies', {
@@ -104,6 +105,20 @@ const Nanny = sequelize.define('nannies', {
     },
     user_id: Sequelize.INTEGER.UNSIGNED,
     biography: Sequelize.TEXT
+});
+
+const Order = sequelize.define('orders', {
+    id: {
+        type: Sequelize.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
+    user_id: Sequelize.INTEGER,
+    sum: Sequelize.DECIMAL(10,2),
+    paket: Sequelize.STRING(16),
+    status: Sequelize.INTEGER,
+    created: Sequelize.DATE,
+    option: Sequelize.ENUM('expr', 'qiwi', 'kkb', 'n/n')
 });
 
 Nanny.hasMany(NannyOrders, {foreignKey: "nanny_id", as: "orders"});
@@ -1045,69 +1060,80 @@ function saveOrderStartPay(ctx, type){
         }
     }).spread((user) => {
         if (user) {
-            let ages = "";
-            session.childrenYears.forEach(function (item) {
-                if (ages === "") {
-                    ages = item;
-                } else {
-                    ages = ages + "," + item;
-                }
-            });
-
-            NannyOrders.create({
+            Order.create({
                 user_id: user.id,
-                nanny_id: session.nanny_id,
-                start: moment(userSessions.getOrderFullTime(ctx, "start")),
-                end: moment(userSessions.getOrderFullTime(ctx, "end")),
-                is_confirmed: 0,
-                is_payed: 0,
-                created_at: moment().utcOffset(360),
-                updated_at: moment().utcOffset(360),
-                child_count: session.countChildren,
-                child_ages: ages,
-                amount: session.amount,
-                payed_type: type
-            }).then(order => {
-                console.log(order);
+                created: moment().utcOffset(360),
+                status: 0,
+                option: (type === "qiwi") ? "qiwi" : "kkb",
+                sum: session.amount,
+                paket: "Заказ почасовой няни"
+            }).then( order =>{
                 if(order){
-                    let systemTypeM = (type === "qiwi") ? "QIWI терминал" : "банковская карта";
-                    let message = 'Ваш заказ № <b>' + order.id + '</b> сохранен, но не оплачен.\n' +
-                        '<b>Сумма к оплате:</b> ' + order.amount + '\n' +
-                        '<b>Начало:</b> ' + moment(order.start).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
-                        '<b>Конец:</b> ' + moment(order.end).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
-                        '<b>Количество детей:</b> ' + order.child_count + '\n' +
-                        '<b>Система оплаты:</b> ' + systemTypeM + '\n';
-                    let howPayMessage = (type === "qiwi") ? "Инструкция к оплате...\n" : "Для продолжения оплаты перейдите по ссылке: http://supernanny.kz" +
-                        "/payments/telegram/payorder?phone=" + session.phone + "&order=" + order.id + " \n";
-                    let postMessage = "Для просмотра своих заказов нажмите кнопку:\n \"🗓 Мои заказы\"";
-                    message = message + howPayMessage + postMessage;
-                    ctx.reply(message, {
-                        parse_mode: "HTML",
-                        reply_markup: {
-                            resize_keyboard: true,
-                            keyboard: [
-                                [{text: "🗓 Мои заказы"}, {text: "🕰 Заказать няню"}],
-                                [{text: "👩‍👦‍👦 Для няни"}, {text: "☎️ Контакты"}]
-                            ]
+                    let ages = "";
+                    session.childrenYears.forEach(function (item) {
+                        if (ages === "") {
+                            ages = item;
+                        } else {
+                            ages = ages + "," + item;
                         }
                     });
-                    userSessions.setSessionType(ctx, null);
+                    NannyOrders.create({
+                        user_id: user.id,
+                        nanny_id: session.nanny_id,
+                        start: moment(userSessions.getOrderFullTime(ctx, "start")),
+                        end: moment(userSessions.getOrderFullTime(ctx, "end")),
+                        is_confirmed: 0,
+                        is_payed: 0,
+                        created_at: moment().utcOffset(360),
+                        updated_at: moment().utcOffset(360),
+                        child_count: session.countChildren,
+                        child_ages: ages,
+                        amount: session.amount,
+                        payed_type: type,
+                        order_id: order.id
+                    }).then(order => {
+                        console.log(order);
+                        if(order){
+                            let systemTypeM = (type === "qiwi") ? "QIWI терминал" : "банковская карта";
+                            let message = 'Ваш заказ № <b>' + order.id + '</b> сохранен, но не оплачен.\n' +
+                                '<b>Сумма к оплате:</b> ' + order.amount + '\n' +
+                                '<b>Начало:</b> ' + moment(order.start).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
+                                '<b>Конец:</b> ' + moment(order.end).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
+                                '<b>Количество детей:</b> ' + order.child_count + '\n' +
+                                '<b>Система оплаты:</b> ' + systemTypeM + '\n';
+                            let howPayMessage = (type === "qiwi") ? "Инструкция к оплате...\n" : "Для продолжения оплаты перейдите по ссылке: http://supernanny.kz" +
+                                "/payments/telegram/payorder?phone=" + session.phone + "&order=" + order.id + " \n";
+                            let postMessage = "Для просмотра своих заказов нажмите кнопку:\n \"🗓 Мои заказы\"";
+                            message = message + howPayMessage + postMessage;
+                            ctx.reply(message, {
+                                parse_mode: "HTML",
+                                reply_markup: {
+                                    resize_keyboard: true,
+                                    keyboard: [
+                                        [{text: "🗓 Мои заказы"}, {text: "🕰 Заказать няню"}],
+                                        [{text: "👩‍👦‍👦 Для няни"}, {text: "☎️ Контакты"}]
+                                    ]
+                                }
+                            });
+                            userSessions.setSessionType(ctx, null);
+                        }
+                    });
+                    let need_save = false;
+                    if(!user.telegram_id){
+                        user.telegram_id = session.telegram_id;
+                        need_save = true;
+                    }
+                    if(!user.name){
+                        user.name = (session.firstName) ? session.firstName : "";
+                        need_save = true;
+                    }
+                    if(!user.lastname){
+                        user.lastname = (session.lastname) ? session.lastname : "";
+                        need_save = true;
+                    }
+                    if(need_save) {user.save();}
                 }
             });
-            let need_save = false;
-            if(!user.telegram_id){
-                user.telegram_id = session.telegram_id;
-                need_save = true;
-            }
-            if(!user.name){
-                user.name = (session.firstName) ? session.firstName : "";
-                need_save = true;
-            }
-            if(!user.lastname){
-                user.lastname = (session.lastname) ? session.lastname : "";
-                need_save = true;
-            }
-            if(need_save) {user.save();}
         }
     });
 }
