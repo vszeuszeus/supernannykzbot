@@ -1066,7 +1066,7 @@ function saveOrderStartPay(ctx, type){
                 status: 0,
                 option: (type === "qiwi") ? "qiwi" : "kkb",
                 sum: session.amount,
-                paket: "Заказ почасовой няни"
+                paket: "Почасовая няня"
             }).then( order =>{
                 if(order){
                     let ages = "";
