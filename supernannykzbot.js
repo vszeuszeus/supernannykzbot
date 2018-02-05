@@ -442,8 +442,13 @@ bot.hears('🗓 Мои заказы', (ctx) => {
             NannyOrders.findAll({
                 where: {
                     user_id: user.id
-                }
+                },
+                include : [{
+                    model : Nanny,
+                    include: [User]
+                }]
             }).then(orders => {
+                console.log(orders);
                 if (orders.length) {
                     orders.forEach(function (item) {
                         let status = (item.is_payed === 0) ? "не оплачен" : "оплачен";
@@ -747,7 +752,7 @@ function sendQuestionCity(ctx) {
             "reply_markup": {
                 "inline_keyboard": [
                     [{text: "Астана", callback_data: "needCity_Astana"}],
-                    [{text: "Алмата", callback_data: "needCity_Almata"}]]
+                    [{text: "Алматы", callback_data: "needCity_Almata"}]]
             }
         }).then(result => {
             if (result.message_id) {
