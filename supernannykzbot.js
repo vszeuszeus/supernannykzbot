@@ -72,7 +72,8 @@ const User = sequelize.define('users', {
     role: Sequelize.ENUM('user', 'nanny', 'admin'),
     created_at: Sequelize.DATE,
     updated_at: Sequelize.DATE,
-    telegram_id: Sequelize.BIGINT
+    telegram_id: Sequelize.BIGINT,
+    photo: Sequelize.STRING
 });
 
 const NannyOrders = sequelize.define('nanny_orders', {
@@ -104,7 +105,8 @@ const Nanny = sequelize.define('nannies', {
         autoIncrement: true
     },
     user_id: Sequelize.INTEGER.UNSIGNED,
-    biography: Sequelize.TEXT
+    biography: Sequelize.TEXT,
+
 });
 
 const Order = sequelize.define('orders', {
@@ -445,10 +447,12 @@ bot.hears('🗓 Мои заказы', (ctx) => {
                 },
                 include : [{
                     model : Nanny,
-                    include: [User]
+                    include: [{
+                        model: User
+                    }]
                 }]
             }).then(orders => {
-                console.log(orders);
+                console.log(orders[0].nanny.user.photo);
                 if (orders.length) {
                     orders.forEach(function (item) {
                         let status = (item.is_payed === 0) ? "не оплачен" : "оплачен";
