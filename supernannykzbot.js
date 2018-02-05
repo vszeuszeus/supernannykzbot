@@ -980,7 +980,8 @@ function recalcTimePicker(ctx) {
 function sendFreeNannies(ctx) {
     userSessions.deleteSessionMessages(ctx);
     sequelize.query('' +
-        "SELECT nannies.id, nannies.biography, nannies.user_id  FROM nannies " +
+        "SELECT nannies.id, nannies.biography, nannies.user_id, nannies.hourly, users.photo  FROM nannies " +
+        "RIGHT JOIN users ON nannies.user_id = users.id" +
         "WHERE NOT EXISTS (" +
         " SELECT * " +
         " FROM nanny_orders " +
@@ -990,8 +991,10 @@ function sendFreeNannies(ctx) {
         " AND nanny_orders.end BETWEEN '" + userSessions.getOrderFullTime(ctx, "start") +
         "' AND '" + userSessions.getOrderFullTime(ctx, "end") + "' " +
         ") " +
+        "AND nannies.hourly = 1" +
         "LIMIT 3 ")
         .then(nannies => {
+            console.log(nannies);
             if (nannies) {
                 addMainMenu(ctx, "Шаг № 9").then(result => {
                     ctx.reply('В выбранное время могут работать следующие няни:').then(
