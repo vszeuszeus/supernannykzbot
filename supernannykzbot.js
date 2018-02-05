@@ -1005,7 +1005,7 @@ function sendFreeNannies(ctx) {
                         }
                     );
                     nannies[0].forEach(function (item) {
-                        ctx.replyWithPhoto({source: "image.jpeg"}, {
+                        ctx.replyWithPhoto({source: "../../www/supernanny.kz/app/webroot" + item.photo}, {
                             caption: item.biography.substr(0, 197) + "...",
                             reply_markup: {
                                 inline_keyboard: [
