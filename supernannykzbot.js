@@ -462,8 +462,7 @@ bot.hears('🗓 Мои заказы', (ctx) => {
                             "<b>5. Сумма к оплате:</b> ***\n" +
                             "<b>6. Статус:</b> " + status + "\n" +
                             "<b>7. Количество детей:</b> " + item.child_count + "\n" +
-                            "<b>8. Имя няни:</b> " + item.nanny.user.name + "\n" +
-                            "<a href='http://supernanny.kz'" + item.nanny.user.photo + ">10. Фото няни: </a>", {
+                            "<b>8. Имя няни:</b> " + item.nanny.user.name + "\n", {
                             parse_mode: "HTML"
                         });
                     })
