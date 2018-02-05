@@ -440,7 +440,6 @@ bot.hears('🗓 Мои заказы', (ctx) => {
         }
     }).then(user => {
         if (user) {
-            console.log(user);
             NannyOrders.findAll({
                 where: {
                     user_id: user.id
@@ -453,6 +452,10 @@ bot.hears('🗓 Мои заказы', (ctx) => {
                 }]
             }).then(orders => {
                 console.log(orders[0].nanny.user.photo);
+                console.log('_________________________________________________');
+                console.log(orders[1].nanny);
+                console.log('________________________________________________');
+                console.log(orders[2].nanny.user);
                 if (orders.length) {
                     orders.forEach(function (item) {
                         let status = (item.is_payed === 0) ? "не оплачен" : "оплачен";
@@ -463,7 +466,9 @@ bot.hears('🗓 Мои заказы', (ctx) => {
                             "<b>4. Конечная дата:</b> " + moment(item.end).format("dddd, D MMMM YYYY, HH:mm:ss") + "'\n" +
                             "<b>5. Сумма к оплате:</b> ***\n" +
                             "<b>6. Статус:</b> " + status + "\n" +
-                            "<b>7. Количество детей:</b> " + item.child_count + "\n", {
+                            "<b>7. Количество детей:</b> " + item.child_count + "\n" +
+                            "<b>8. Имя няни:</b> " + item.nanny.user.name + "\n" +
+                            "<a href='http://supernanny.kz/'" + item.nanny.user.photo + "></a>", {
                             parse_mode: "HTML"
                         });
                     })
