@@ -459,7 +459,7 @@ bot.hears('🗓 Мои заказы', (ctx) => {
                             "<b>2. Дата создания:</b> " + moment(item.created_at).format("dddd, D MMMM YYYY, HH:mm:ss") + "\n" +
                             "<b>3. Начальная дата:</b> " + moment(item.start).format("dddd, D MMMM YYYY, HH:mm:ss") + "\n" +
                             "<b>4. Конечная дата:</b> " + moment(item.end).format("dddd, D MMMM YYYY, HH:mm:ss") + "\n" +
-                            "<b>5. Сумма к оплате:</b> " + item.amount + "\n" +
+                            "<b>5. Сумма к оплате:</b> " + item.amount + " тенге \n" +
                             "<b>6. Статус:</b> " + status + "\n" +
                             "<b>7. Количество детей:</b> " + item.child_count + "\n" +
                             "<b>8. Имя няни:</b> " + item.nanny.user.name + "\n", {
