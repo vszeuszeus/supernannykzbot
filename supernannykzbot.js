@@ -116,7 +116,7 @@ const Order = sequelize.define('orders', {
         autoIncrement: true
     },
     user_id: Sequelize.INTEGER,
-    sum: Sequelize.DECIMAL(10,2),
+    sum: Sequelize.DECIMAL(10, 2),
     paket: Sequelize.STRING(16),
     status: Sequelize.INTEGER,
     created: Sequelize.DATE,
@@ -206,6 +206,23 @@ let userSessions = {
         let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
         if (userSessions.hasOwnProperty(chat_id)) {
             return userSessions[chat_id].countChildren;
+        } else {
+            return false;
+        }
+    }
+    ,
+    setCountMiniChildren: function (ctx, count = 1) {
+        let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
+        if (userSessions.hasOwnProperty(chat_id)) {
+            userSessions[chat_id].countMiniChildren = count;
+        } else {
+            return false;
+        }
+    },
+    getCountMiniChildren: function (ctx) {
+        let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
+        if (userSessions.hasOwnProperty(chat_id)) {
+            return userSessions[chat_id].countMiniChildren;
         } else {
             return false;
         }
@@ -348,9 +365,12 @@ let NewUserSession = function (ctx) {
     this.amount = 20;
     this.offer = null;
     this.nanny_id = null;
+    this.selectedNannies = [];
+    this.countNannies = null;
     this.saved = false;
     this.sendedMessages = [];
     this.countChildren = null;
+    this.countMiniChildren = null;
     this.childrenYears = [];
     this.sessionType = null;
     this.order = {
@@ -444,8 +464,8 @@ bot.hears('🗓 Мои заказы', (ctx) => {
                 where: {
                     user_id: user.id
                 },
-                include : [{
-                    model : Nanny,
+                include: [{
+                    model: Nanny,
                     include: [{
                         model: User
                     }]
@@ -773,8 +793,33 @@ function sendChildCountChooser(ctx) {
                 "inline_keyboard": [
                     [{text: "1", callback_data: "countChildren_1"}],
                     [{text: "2", callback_data: "countChildren_2"}],
-                    [{text: "3", callback_data: "countChildren_3"}]
+                    [{text: "3", callback_data: "countChildren_3"}],
+                    [{text: "4", callback_data: "countChildren_4"}],
+                    [{text: "5", callback_data: "countChildren_5"}],
+                    [{text: "6", callback_data: "countChildren_6"}],
+                    [{text: "7", callback_data: "countChildren_7"}],
+                    [{text: "8", callback_data: "countChildren_8"}]
                 ],
+            }
+        }).then(result => {
+            if (result.message_id) {
+                userSessions.setSessionSendedMessage(ctx, result.message_id);
+            }
+        });
+    });
+}
+
+function sendMiniChildYears(ctx){
+    userSessions.deleteSessionMessages(ctx);
+    let childs = userSessions.getCountChildren(ctx);
+    let keyboard = [];
+    for (let i = 1 ; i <= childs ; i++) {
+        keyboard.push([{text: i, callback_data: "countChildren_" + i}])
+    }
+    addMainMenu(ctx, 'Шаг № 4').then(result => {
+        ctx.reply('Выбрано ' + childs + 'детей. Каждый ребенок младше полутора лет, требует Сколько из них младше полтора года?', {
+            "reply_markup": {
+                "inline_keyboard": keyboard,
             }
         }).then(result => {
             if (result.message_id) {
@@ -924,7 +969,7 @@ function recalcTimePicker(ctx) {
             switch (splitData[3]) {
                 case "3chas":
                     hoursSplit = +hoursSplit - 3;
-                    if(hoursSplit < 0){
+                    if (hoursSplit < 0) {
                         hoursSplit = 24 + hoursSplit; //+ потому что - и - дают плюс а число с минусом поэтому ставим плюс
                     }
                     break;
@@ -953,8 +998,8 @@ function recalcTimePicker(ctx) {
             switch (splitData[3]) {
                 case "3chas":
                     hoursSplit = +hoursSplit + 3;
-                    if(hoursSplit === 24) hoursSplit = "00";
-                    if(hoursSplit > 24){
+                    if (hoursSplit === 24) hoursSplit = "00";
+                    if (hoursSplit > 24) {
                         hoursSplit = +hoursSplit - 24;
                     }
                     break;
@@ -1051,7 +1096,8 @@ function sentPayment(ctx) {
         });
     });
 }
-function saveOrderStartPay(ctx, type){
+
+function saveOrderStartPay(ctx, type) {
     userSessions.deleteSessionMessages(ctx);
     let session = userSessions.getSession(ctx);
     User.findOrCreate({
@@ -1078,8 +1124,8 @@ function saveOrderStartPay(ctx, type){
                 option: (type === "qiwi") ? "qiwi" : "kkb",
                 sum: session.amount,
                 paket: "Почасовая няня"
-            }).then( order =>{
-                if(order){
+            }).then(order => {
+                if (order) {
                     let ages = "";
                     session.childrenYears.forEach(function (item) {
                         if (ages === "") {
@@ -1104,7 +1150,7 @@ function saveOrderStartPay(ctx, type){
                         order_id: order.id
                     }).then(order => {
                         console.log(order);
-                        if(order){
+                        if (order) {
                             let systemTypeM = (type === "qiwi") ? "QIWI терминал" : "банковская карта";
                             let message = 'Ваш заказ № <b>' + order.id + '</b> сохранен, но не оплачен.\n' +
                                 '<b>Сумма к оплате:</b> ' + order.amount + '\n' +
@@ -1130,25 +1176,26 @@ function saveOrderStartPay(ctx, type){
                         }
                     });
                     let need_save = false;
-                    if(!user.telegram_id){
+                    if (!user.telegram_id) {
                         user.telegram_id = session.telegram_id;
                         need_save = true;
                     }
-                    if(!user.name){
+                    if (!user.name) {
                         user.name = (session.firstName) ? session.firstName : "";
                         need_save = true;
                     }
-                    if(!user.lastname){
+                    if (!user.lastname) {
                         user.lastname = (session.lastname) ? session.lastname : "";
                         need_save = true;
                     }
-                    if(need_save) {user.save();}
+                    if (need_save) {
+                        user.save();
+                    }
                 }
             });
         }
     });
 }
-
 
 
 bot.startPolling();
