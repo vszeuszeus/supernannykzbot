@@ -16,10 +16,9 @@ moment.updateLocale('ru', {
     ]
 });
 
-const token = "494928840:AAHD8Aiven5HcWQf-9k2WLQsv5S8WStITi0";
-//const token = "497454060:AAHiV3SLyh5uNs21ifikpzwfOWMLAyHjfN8";
+//const token = "494928840:AAHD8Aiven5HcWQf-9k2WLQsv5S8WStITi0";
+const token = "497454060:AAHiV3SLyh5uNs21ifikpzwfOWMLAyHjfN8";
 
-//const bot = new Telegrambot(token, {polling: true}); telegram-bot-api
 const bot = new Telegraf(token);
 
 const calendar = new Calendar(bot, {
@@ -31,20 +30,20 @@ const calendar = new Calendar(bot, {
     ]
 });
 
-/*const database = "supernanny";
-const user = "root";
-const password = "s12q!Bza";
-const host = "localhost";*/
-
 const database = "supernanny";
+const user = "root";
+const password = "123";
+const host = "localhost";
+
+/*const database = "supernanny";
 const user = "supernannydb";
 const password = "93TntM9aWgWM3NDVBqoW";
-const host = "localhost";
+const host = "localhost";*/
 
 const sequelize = new Sequelize(database, user, password, {
     timezone: "+06:00",
     host: host,
-    port: 3310,
+    port: 3306,
     dialect: 'mysql',
     pool: {
         max: 20,
@@ -83,8 +82,19 @@ const NannyOrders = sequelize.define('nanny_orders', {
             primaryKey: true,
             autoIncrement: true
         },
-    user_id: Sequelize.INTEGER.UNSIGNED,
+    norder_id: Sequelize.INTEGER.UNSIGNED,
     nanny_id: Sequelize.INTEGER.UNSIGNED,
+
+});
+
+const NOrder = sequelize.define('norders', {
+    id:
+        {
+            type: Sequelize.BIGINT,
+            primaryKey: true,
+            autoIncrement: true
+        },
+    user_id: Sequelize.INTEGER.UNSIGNED,
     start: Sequelize.DATE,
     end: Sequelize.DATE,
     is_payed: Sequelize.INTEGER,
@@ -92,10 +102,10 @@ const NannyOrders = sequelize.define('nanny_orders', {
     created_at: Sequelize.DATE,
     updated_at: Sequelize.DATE,
     child_count: Sequelize.INTEGER,
-    child_ages: Sequelize.STRING(20),
     payed_type: Sequelize.STRING(30),
     amount: Sequelize.INTEGER,
-    order_id: Sequelize.INTEGER
+    order_id: Sequelize.INTEGER,
+    babies: Sequelize.INTEGER
 });
 
 const Nanny = sequelize.define('nannies', {
@@ -155,11 +165,11 @@ let userSessions = {
             if (
                 session.telegram_id &&
                 session.city &&
-                session.nanny_id &&
+                session.selectedNannies.length &&
                 session.offer &&
                 session.phone &&
                 session.countChildren &&
-                session.childrenYears &&
+                session.countMiniChildren &&
                 session.order.startTime &&
                 session.order.endTime &&
                 session.order.startDate &&
@@ -227,14 +237,6 @@ let userSessions = {
             return false;
         }
     },
-    setChildYear: function (ctx, year = 0) {
-        let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
-        if (userSessions.hasOwnProperty(chat_id)) {
-            userSessions[chat_id].childrenYears.push(year);
-        } else {
-            return false;
-        }
-    },
     setSessionContacts: function (ctx, userId = null, firstName = null, lastName = null, phone = null) {
         let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
         if (userSessions.hasOwnProperty(chat_id)) {
@@ -266,6 +268,14 @@ let userSessions = {
         let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
         if (userSessions.hasOwnProperty(chat_id)) {
             return userSessions[chat_id].order[type + "Date"];
+        } else {
+            return false;
+        }
+    },
+    getOrderDateRe: function (ctx, type = "start") {
+        let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
+        if (userSessions.hasOwnProperty(chat_id)) {
+            return moment(userSessions[chat_id].order[type + "Date"]).format("dddd, D MMMM YYYY");
         } else {
             return false;
         }
@@ -303,10 +313,11 @@ let userSessions = {
             return false;
         }
     },
-    setOrderNanny: function (ctx, nanny_id) {
+    getOrderFullTimeRe: function (ctx, type = "start") {
         let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
         if (userSessions.hasOwnProperty(chat_id)) {
-            userSessions[chat_id].nanny_id = nanny_id;
+            return moment(userSessions[chat_id].order[type + "Date"]
+                + " " + userSessions[chat_id].order[type + "Time"] + ":00").format("dddd, D MMMM YYYY, HH:mm:ss");
         } else {
             return false;
         }
@@ -352,6 +363,38 @@ let userSessions = {
             });
             userSessions[chat_id].sendedMessages = [];
         }
+    },
+    setCountNannies: function (ctx, count = 1) {
+        let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
+        if (userSessions.hasOwnProperty(chat_id)) {
+            userSessions[chat_id].countNannies = count;
+        } else {
+            return false;
+        }
+    },
+    getCountNannies: function (ctx) {
+        let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
+        if (userSessions.hasOwnProperty(chat_id)) {
+            return userSessions[chat_id].countNannies;
+        } else {
+            return false;
+        }
+    },
+    setSelectedNanny: function (ctx, nanny_id) {
+        let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
+        if (userSessions.hasOwnProperty(chat_id)) {
+            userSessions[chat_id].selectedNannies.push(nanny_id);
+        } else {
+            return false;
+        }
+    },
+    getSelectedNannies: function (ctx) {
+        let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
+        if (userSessions.hasOwnProperty(chat_id)) {
+            return userSessions[chat_id].selectedNannies;
+        } else {
+            return false;
+        }
     }
 };
 console.log(userSessions);
@@ -361,24 +404,22 @@ let NewUserSession = function (ctx) {
     this.firstName = null;
     this.lastName = null;
     this.phone = null;
-    this.city = null;
-    this.amount = 20;
-    this.offer = null;
-    this.nanny_id = null;
-    this.selectedNannies = [];
-    this.countNannies = null;
+    this.city = null; //город заказа
+    this.amount = 20; //сумма заказа
+    this.offer = null; //соглашения публ. оферты
+    this.selectedNannies = []; //выбранные няни
+    this.countNannies = null; //нужное количество нянь
     this.saved = false;
-    this.sendedMessages = [];
-    this.countChildren = null;
-    this.countMiniChildren = null;
-    this.childrenYears = [];
-    this.sessionType = null;
+    this.sendedMessages = []; //отравленные сообщения
+    this.countChildren = null; //количество детей
+    this.countMiniChildren = 0; //количество <1.5 года детей из общего количества
+    this.sessionType = null; //хранение тип сессиии
     this.order = {
         startDate: null,
         endDate: null,
         startTime: null,
         endTime: null,
-        nowType: null
+        nowType: null //хранение типа даты для пикера
     };
 };
 
@@ -592,19 +633,25 @@ bot.on('callback_query', (ctx) => {
             break;
 
         case "countChildren":
-            userSessions.setCountChildren(ctx, +splitData[1]);
-            sendChildYears(ctx, +splitData[1], 0);
+            let countChildren = +splitData[1];
+            userSessions.setCountChildren(ctx, countChildren);
+            (countChildren === 1) ? sendChildYears(ctx)
+                : sendMiniChildCount(ctx);
             break;
 
         case "yearChild":
-            let count = userSessions.getCountChildren(ctx);
-            userSessions.setChildYear(ctx, +splitData[2]);
-            if (splitData[1] == count) {
-                console.log(userSessions);
-                sendOrderDateChooser(ctx, "start");
-            } else {
-                sendChildYears(ctx, count, +splitData[1]);
-            }
+            let yearChild = +splitData[1];
+            (yearChild === 1) ? userSessions.setCountMiniChildren(ctx, 1)
+                : userSessions.setCountMiniChildren(ctx, 0);
+            matchCountNanny(ctx);
+            sendOrderDateChooser(ctx, "start");
+            break;
+
+        case "countMiniChildren":
+            let countMiniChildren = +splitData[1];
+            userSessions.setCountMiniChildren(ctx, countMiniChildren);
+            matchCountNanny(ctx);
+            sendOrderDateChooser(ctx, "start");
             break;
 
         case "timePicker":
@@ -631,13 +678,8 @@ bot.on('callback_query', (ctx) => {
             break;
 
         case "chooseNanny":
-            userSessions.setOrderNanny(ctx, splitData[1]);
-            console.log(userSessions);
-            if (userSessions.testSession(ctx)) {
-                sentPayment(ctx);
-            } else {
-                console.log("testSessionFalse");
-            }
+            userSessions.setSelectedNanny(ctx, +splitData[1]);
+            sendFreeNannies(ctx);
             break;
 
         case "payment":
@@ -670,6 +712,14 @@ bot.on('callback_query', (ctx) => {
     }
 
 });
+
+function matchCountNanny(ctx) {
+    let countC = userSessions.getCountChildren(ctx);
+    let countNanny = userSessions.getCountMiniChildren(ctx);
+    let a = countC - countNanny;
+    countNanny += (Math.floor(a / 3)) + ((a % 3 !== 0) ? 1 : 0);
+    userSessions.setCountNannies(ctx, countNanny);
+}
 
 function testTime(ctx) {
     let type = userSessions.getOrderNowType(ctx);
@@ -788,17 +838,88 @@ function sendQuestionCity(ctx) {
 function sendChildCountChooser(ctx) {
     userSessions.deleteSessionMessages(ctx);
     addMainMenu(ctx, "Шаг № 3").then(result => {
-        ctx.reply('Для какого количества детей Вам нужна няня?', {
+        ctx.reply(
+            '<b>Для какого количества детей Вам нужна няня?</b>\n ' +
+            'Стоимость нянь:\n' +
+            'С <b>09.00</b> до <b>21.00</b> – 1 час 1500 тг. (1,2 ребёнка), 2000 (3 ребёнка) \n' +
+            'С <b>21.00</b> до <b>09.00</b> – 1 час 2000 тг (1,2 ребёнка), 2500 тг (3 ребёнка)\n' +
+            'Каждя няня следит максимум за тремя детьми.\n' +
+            'Каждый ребенок моложе 18 мес. требует отдельного внимания няни.', {
             "reply_markup": {
                 "inline_keyboard": [
-                    [{text: "1", callback_data: "countChildren_1"}],
-                    [{text: "2", callback_data: "countChildren_2"}],
-                    [{text: "3", callback_data: "countChildren_3"}],
-                    [{text: "4", callback_data: "countChildren_4"}],
-                    [{text: "5", callback_data: "countChildren_5"}],
-                    [{text: "6", callback_data: "countChildren_6"}],
-                    [{text: "7", callback_data: "countChildren_7"}],
-                    [{text: "8", callback_data: "countChildren_8"}]
+                    [{text: "1", callback_data: "countChildren_1"},
+                    {text: "2", callback_data: "countChildren_2"},
+                    {text: "3", callback_data: "countChildren_3"},
+                    {text: "4", callback_data: "countChildren_4"},
+                    {text: "5", callback_data: "countChildren_5"},
+                    {text: "6", callback_data: "countChildren_6"},
+                    {text: "7", callback_data: "countChildren_7"},
+                    {text: "8", callback_data: "countChildren_8"}]
+                ]
+            },
+            parse_mode: 'html'
+        }).then(result => {
+            if (result.message_id) {
+                userSessions.setSessionSendedMessage(ctx, result.message_id);
+            }
+        });
+    });
+}
+
+function sendMiniChildCount(ctx) {
+    userSessions.deleteSessionMessages(ctx);
+    let childs = userSessions.getCountChildren(ctx);
+    let keyboard = [];
+    for (let i = 1; i <= childs; i++) {
+        keyboard.push({text: i, callback_data: "countMiniChildren_" + i})
+    }
+    addMainMenu(ctx, 'Шаг № 4').then(result => {
+        let message = "";
+        if(childs === 1) {
+            message = "Выбран 1 ребенок.";
+        }
+        if((childs > 1) && (childs < 5)){
+            message = "Выбрано " + childs + " ребенка.";
+        }
+        if(childs > 4) {
+            message = "Выбрано " + childs + " детей.";
+        }
+
+        ctx.reply(message + '\n' +
+            '<b>Выберите количество детей моложе 18 мес.</b>', {
+            "reply_markup": {
+                "inline_keyboard": [keyboard],
+            },
+            parse_mode: 'html'
+        }).then(result => {
+            if (result.message_id) {
+                userSessions.setSessionSendedMessage(ctx, result.message_id);
+            }
+        });
+    });
+}
+
+function sendChildYears(ctx) {
+    userSessions.deleteSessionMessages(ctx);
+
+    addMainMenu(ctx, message).then(result => {
+        ctx.reply("Пожалуйста, выберите возраст ребенка", {
+            "reply_markup": {
+                "inline_keyboard": [
+                    [
+                        {text: "мл. 18 м.", callback_data: "yearChild_1"},
+                        {text: "2 года", callback_data: "yearChild_2"},
+                        {text: "3 года", callback_data: "yearChild_3"},
+                        {text: "4 года", callback_data: "yearChild_4"}
+                    ],
+                    [
+                        {text: "5 лет", callback_data: "yearChild_5"},
+                        {text: "6 лет", callback_data: "yearChild_6"},
+                        {text: "7 лет", callback_data: "yearChild_7"},
+                        {text: "8 лет", callback_data: "yearChild_8"},
+                        {text: "9 лет", callback_data: "yearChild_9"},
+                        {text: "10 лет", callback_data: "yearChild_10"}
+                    ]
                 ],
             }
         }).then(result => {
@@ -809,90 +930,24 @@ function sendChildCountChooser(ctx) {
     });
 }
 
-function sendMiniChildYears(ctx){
-    userSessions.deleteSessionMessages(ctx);
-    let childs = userSessions.getCountChildren(ctx);
-    let keyboard = [];
-    for (let i = 1 ; i <= childs ; i++) {
-        keyboard.push([{text: i, callback_data: "countChildren_" + i}])
-    }
-    addMainMenu(ctx, 'Шаг № 4').then(result => {
-        ctx.reply('Выбрано ' + childs + 'детей. Каждый ребенок младше полутора лет, требует Сколько из них младше полтора года?', {
-            "reply_markup": {
-                "inline_keyboard": keyboard,
-            }
-        }).then(result => {
-            if (result.message_id) {
-                userSessions.setSessionSendedMessage(ctx, result.message_id);
-            }
-        });
-    });
-}
-
-function sendChildYears(ctx, countChildren = 1, childChoosed = 0) {
-    userSessions.deleteSessionMessages(ctx);
-    let nowChildChoos = childChoosed + 1;
-    let message = (countChildren > 1) ? "Шаг № 4 (Ребенок № " + nowChildChoos + ")" : "Шаг № 4 ";
-    let nameChild = "";
-    switch (nowChildChoos) {
-        case 1:
-            if (countChildren > 1) {
-                nameChild = "первого ";
-            } else {
-                nameChild = "";
-            }
-            break;
-        case 2:
-            nameChild = "второго ";
-            break;
-        case 3:
-            nameChild = "третьего ";
-            break;
-    }
-    if (childChoosed < countChildren) {
-        addMainMenu(ctx, message).then(result => {
-            ctx.reply('Выберите возраст ' + nameChild + "ребенка", {
-                "reply_markup": {
-                    "inline_keyboard": [
-                        [
-                            {text: "мл. 1 года", callback_data: "yearChild_" + nowChildChoos + "_" + "0"},
-                            {text: "1 год", callback_data: "yearChild_" + nowChildChoos + "_" + "1"},
-                            {text: "2 года", callback_data: "yearChild_" + nowChildChoos + "_" + "2"},
-                            {text: "3 года", callback_data: "yearChild_" + nowChildChoos + "_" + "3"},
-                            {text: "4 года", callback_data: "yearChild_" + nowChildChoos + "_" + "4"}
-                        ],
-                        [
-                            {text: "5 лет", callback_data: "yearChild_" + nowChildChoos + "_" + "5"},
-                            {text: "6 лет", callback_data: "yearChild_" + nowChildChoos + "_" + "6"},
-                            {text: "7 лет", callback_data: "yearChild_" + nowChildChoos + "_" + "7"},
-                            {text: "8 лет", callback_data: "yearChild_" + nowChildChoos + "_" + "8"},
-                            {text: "9 лет", callback_data: "yearChild_" + nowChildChoos + "_" + "9"},
-                            {text: "10 лет", callback_data: "yearChild_" + nowChildChoos + "_" + "10"}
-                        ]
-                    ],
-                }
-            }).then(result => {
-                if (result.message_id) {
-                    userSessions.setSessionSendedMessage(ctx, result.message_id);
-                }
-            });
-        });
-    }
-}
-
 function sendOrderDateChooser(ctx, type = "start", error = "") {
     userSessions.deleteSessionMessages(ctx);
-    let message = null;
+    let message = "";
     let preMessage = "\n<b>*Дата бронирования должна опережать текущее время не меньше чем на 3 часа.</b>";
+
     switch (type) {
         case "start":
-            message = "В какое время Вам необходима няня? \n1. День с 9:00-19:00 1500-2000т.\n" +
-                "2. Вечер 2000-2500т.\n3. Ночь 2500т.\nПожалуйста, выберите в календаре начальную дату бронирования" + preMessage;
+            message = "<b>Пожалуйста, выберите в календаре день начала заказа.</b>" + preMessage;
             break;
         case "end":
-            message = "Выберите конечную дату бронирования. \nНачальная дата - " + userSessions.getOrderFullTime(ctx, "start");
+            message = "<b>Пожалуйста, выберите в календаре день окончания заказа.</b>\n" +
+                "Начальная дата - <b>" + userSessions.getOrderFullTimeRe(ctx, "start") + "</b>";
             break;
     }
+    message += '\nСтоимость нянь:\n' +
+        'С <b>09.00</b> до <b>21.00</b> – 1 час 1500 тг. (1,2 ребёнка), 2000 (3 ребёнка) \n' +
+        'С <b>21.00</b> до <b>09.00</b> – 1 час 2000 тг (1,2 ребёнка), 2500 тг (3 ребёнка)\n';
+
     userSessions.setOrderNowType(ctx, type);
     if (error) {
         let newError = "<b>Ошибка: " + error + "</b>\n";
@@ -925,11 +980,20 @@ function sendOrderTimeChooser(ctx, type = "start") {
 function makeDatePicker(ctx, time, type = "start") {
 
     let val = (type === "start") ? "timePicker_start" : "timePicker_end";
-    let text = (type === "start") ? 'Задайте начальное время брони' : 'Задайте конечное время брони';
+    let text = (type === "start")
+        ?   '<b>Выбранный день:</b>\n' + userSessions.getOrderDateRe(ctx, "start") +
+            '\nВыберите время <b>начала</b>  заказа. \nПрибавте либо отнимите промежуток времени при помощи кнопок ниже,' +
+            ' иначе нажмите "Готово", если указанное время Вас устраивает'
+        :   '<b>Дата начала заказа:</b>' + userSessions.getOrderFullTimeRe(ctx, "start") + "\n" +
+            "<b>День окончания заказа:</b>\n" + userSessions.getOrderDateRe(ctx, "end") +
+            '\nВыберите время <b>окончания</b>  заказа. \nПрибавте либо отнимите промежуток времени при помощи кнопок ниже,' +
+            ' иначе нажмите "Готово", если указанное время Вас устраивает'
+    ;
+    console.log(text);
     let step = (type === "start") ? "6" : "8";
     addMainMenu(ctx, "Шаг № " + step).then(result => {
         ctx.reply(text, {
-            "reply_markup": {
+            reply_markup: {
                 "inline_keyboard": [
                     [
                         {text: " - 3 часа", callback_data: val + "_minus_3chas"},
@@ -947,7 +1011,8 @@ function makeDatePicker(ctx, time, type = "start") {
                     ],
                     [{text: "Готово", callback_data: "timePicker_quit_" + type}]
                 ]
-            }
+            },
+            parse_mode: 'html'
         }).then(result => {
             if (result.message_id) {
                 userSessions.setSessionSendedMessage(ctx, result.message_id);
@@ -1032,48 +1097,96 @@ function recalcTimePicker(ctx) {
 
 function sendFreeNannies(ctx) {
     userSessions.deleteSessionMessages(ctx);
-    sequelize.query('' +
-        "SELECT nannies.id, nannies.biography, nannies.user_id, nannies.hourly, users.photo  FROM nannies " +
-        "RIGHT JOIN users ON nannies.user_id = users.id " +
-        "WHERE NOT EXISTS (" +
-        " SELECT * " +
-        " FROM nanny_orders " +
-        " WHERE nanny_orders.nanny_id = nannies.id " +
-        " AND nanny_orders.start BETWEEN '" + userSessions.getOrderFullTime(ctx, "start") +
-        "' AND '" + userSessions.getOrderFullTime(ctx, "end") + "' " +
-        " AND nanny_orders.end BETWEEN '" + userSessions.getOrderFullTime(ctx, "start") +
-        "' AND '" + userSessions.getOrderFullTime(ctx, "end") + "' " +
-        ") " +
-        "AND nannies.hourly = 1 " +
-        "LIMIT 3 ")
-        .then(nannies => {
-            console.log(nannies);
-            if (nannies) {
-                addMainMenu(ctx, "Шаг № 9").then(result => {
-                    ctx.reply('В выбранное время могут работать следующие няни:').then(
-                        result => {
-                            if (result.message_id) {
-                                userSessions.setSessionSendedMessage(ctx, result.message_id);
-                            }
-                        }
-                    );
-                    nannies[0].forEach(function (item) {
-                        ctx.replyWithPhoto({source: "../../www/supernanny.kz/app/webroot" + item.photo}, {
-                            caption: item.biography.substr(0, 197) + "...",
-                            reply_markup: {
-                                inline_keyboard: [
-                                    [{text: "Заказать", callback_data: "chooseNanny_" + item.id}]
-                                ]
-                            }
-                        }).then(result => {
-                            if (result.message_id) {
-                                userSessions.setSessionSendedMessage(ctx, result.message_id);
-                            }
-                        });
-                    });
-                });
-            }
+    let nanniesCount = userSessions.getCountNannies(ctx); //количество нянь
+    let selectedNannies = userSessions.getSelectedNannies(ctx); //выбранные няни
+    let epxNannies = "";
+
+    if (selectedNannies.length < nanniesCount) {
+        let countChildren = userSessions.getCountChildren(ctx);
+        let countBaby = userSessions.getCountMiniChildren(ctx);
+
+        selectedNannies.forEach(function (item) {
+            epxNannies = (epxNannies) ? "," + item : ""+item;
         });
+        epxNannies = epxNannies.substr(0, epxNannies.length - 1);
+        let query = "" +
+            "SELECT nannies.id, nannies.biography, nannies.user_id, users.photo  FROM nannies " +
+            "RIGHT JOIN users ON nannies.user_id = users.id " +
+            "WHERE NOT EXISTS (" +
+            " SELECT *" +
+            " FROM nanny_orders " +
+            " INNER JOIN norders ON nanny_orders.norder_id = norders.id " +
+            " WHERE nanny_orders.nanny_id = nannies.id" +
+            " AND norders.start BETWEEN '" + userSessions.getOrderFullTime(ctx, "start") +
+            "' AND '" + userSessions.getOrderFullTime(ctx, "end") + "' " +
+            " AND norders.end BETWEEN '" + userSessions.getOrderFullTime(ctx, "start") +
+            "' AND '" + userSessions.getOrderFullTime(ctx, "end") + "' " +
+            ") " +
+            //"AND nannies.hourly = 1 " +
+            "AND nannies.id NOT IN (0" + ((epxNannies) ? epxNannies : "") + ") " +
+            "" +
+            "LIMIT 8";
+        console.log("2" + query);
+        console.log(query);
+        sequelize.query(query)
+            .then(nannies => {
+                    console.log(nannies);
+                    if (nannies) {
+                        addMainMenu(ctx, "Шаг № 9").then(result => {
+                            let toMes = '' +
+                                '<b>Дата начала заказа</b>: \n' +
+                                moment(userSessions.getOrderFullTime(ctx, "start")).format("dddd, D MMMM YYYY, HH:mm:ss") + "\n" +
+                                '<b>Дата окончания заказа</b>: \n' +
+                                moment(userSessions.getOrderFullTime(ctx, "end")).format("dddd, D MMMM YYYY, HH:mm:ss") + "\n" +
+                                '<b>Количество детей</b>: ' + countChildren + "\n" +
+                                '<b>Количество детей моложе 18мес.</b>: ' + countBaby + "\n" +
+                                '<b>Сумма заказа: </b>' + '20' + "\n" +
+                                '<b>Необходимо нянь</b>: ' + nanniesCount + "\n" +
+                                'Нужно выбрать еще <b>' + (nanniesCount - selectedNannies.length) + "</b> " +
+                                (((nanniesCount - selectedNannies.length) === 1) ? "нянь." : "няни.") + "\n" +
+                                'В выбранное время могут работать следующие няни:';
+                            console.log(toMes);
+                            ctx.reply(toMes, {parse_mode:"html"}).then(
+                                result => {
+                                    if (result.message_id) {
+                                        userSessions.setSessionSendedMessage(ctx, result.message_id);
+                                    }
+                                }
+                            );
+                            nannies[0].forEach(function (item) {
+                                ctx.replyWithPhoto({source: "image.jpeg"/*"../../www/supernanny.kz/app/webroot" + item.photo*/}, {
+                                    caption: item.biography.substr(0, 197) + "...",
+                                    reply_markup: {
+                                        inline_keyboard: [
+                                            [{text: "Пригласить", callback_data: "chooseNanny_" + item.id}]
+                                        ]
+                                    }
+                                }).then(result => {
+                                    if (result.message_id) {
+                                        userSessions.setSessionSendedMessage(ctx, result.message_id);
+                                    }
+                                });
+                            });
+                        });
+                    }
+                }
+            );
+    }else{
+        if(userSessions.testSession(ctx)){
+            sentPayment(ctx);
+        }else{
+            addMainMenu(ctx, "Шаг № 9").then(result => {
+                ctx.reply('Ошибка проверки сессии, начните заказ сначала'
+                    ).then(
+                    result => {
+                        if (result.message_id) {
+                            userSessions.setSessionSendedMessage(ctx, result.message_id);
+                        }
+                    }
+                );
+            });
+        }
+    }
 }
 
 
@@ -1126,17 +1239,8 @@ function saveOrderStartPay(ctx, type) {
                 paket: "Почасовая няня"
             }).then(order => {
                 if (order) {
-                    let ages = "";
-                    session.childrenYears.forEach(function (item) {
-                        if (ages === "") {
-                            ages = item;
-                        } else {
-                            ages = ages + "," + item;
-                        }
-                    });
-                    NannyOrders.create({
+                    NOrder.create({
                         user_id: user.id,
-                        nanny_id: session.nanny_id,
                         start: moment(userSessions.getOrderFullTime(ctx, "start")),
                         end: moment(userSessions.getOrderFullTime(ctx, "end")),
                         is_confirmed: 0,
@@ -1144,19 +1248,25 @@ function saveOrderStartPay(ctx, type) {
                         created_at: moment().utcOffset(360),
                         updated_at: moment().utcOffset(360),
                         child_count: session.countChildren,
-                        child_ages: ages,
                         amount: session.amount,
                         payed_type: type,
-                        order_id: order.id
-                    }).then(order => {
-                        console.log(order);
-                        if (order) {
+                        order_id: order.id,
+                        babies: session.countMiniChildren
+                    }).then(norder => {
+                        if (norder) {
+                            session.selectedNannies.forEach(function(item){
+                                NannyOrder.create({
+                                    nanny_id: item,
+                                    norder_id: norder.id
+                                });
+                            });
                             let systemTypeM = (type === "qiwi") ? "QIWI терминал" : "банковская карта";
-                            let message = 'Ваш заказ № <b>' + order.id + '</b> сохранен, но не оплачен.\n' +
-                                '<b>Сумма к оплате:</b> ' + order.amount + '\n' +
-                                '<b>Начало:</b> ' + moment(order.start).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
-                                '<b>Конец:</b> ' + moment(order.end).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
-                                '<b>Количество детей:</b> ' + order.child_count + '\n' +
+                            let message = 'Ваш заказ № <b>' + norder.id + '</b> сохранен, но не оплачен.\n' +
+                                '<b>Сумма к оплате:</b> ' + norder.amount + '\n' +
+                                '<b>Дата начала заказа:</b> ' + moment(norder.start).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
+                                '<b>Дата окончания заказа:</b> ' + moment(norder.end).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
+                                '<b>Количество детей:</b> ' + norder.child_count + '\n' +
+                                '<b>Количество нянь:</b> ' + session.countNannies + '\n' +
                                 '<b>Система оплаты:</b> ' + systemTypeM + '\n';
                             let howPayMessage = (type === "qiwi") ? "Инструкция к оплате...\n" : "Для продолжения оплаты перейдите по ссылке: http://supernanny.kz" +
                                 "/payments/telegram/payorder?phone=" + session.phone + "&order=" + order.id + " \n";
