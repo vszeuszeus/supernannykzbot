@@ -1161,7 +1161,7 @@ function sendFreeNannies(ctx) {
                             );
                             nannies[0].forEach(function (item) {
                                 ctx.replyWithPhoto({source: "../../www/supernanny.kz/app/webroot" + item.photo}, {
-                                    caption: item.biography.substr(0, 155) + '...\n' + 'Посмотреть на сайте\nhttp://supernanny.kz/234234' + item.id + '/',
+                                    caption: item.biography.substr(0, 150) + '...\n' + 'Посмотреть на сайте\nhttp://supernanny.kz/234234' + item.id + '/',
                                     reply_markup: {
                                         inline_keyboard: [
                                             [{text: "Пригласить", callback_data: "chooseNanny_" + item.id}]
