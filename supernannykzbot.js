@@ -206,6 +206,70 @@ let cronSenderStartOrder = new CronJob({
     start: true,
     timeZone: 'Asia/Almaty'
 });
+
+let cronSenderEndOrder = new CronJob({
+    cronTime: '0 * * * * *',
+    onTick: function() {
+        let dataTime = moment();
+        NOrder.findAll({
+            where: {
+                end: dataTime,
+                is_payed: 1
+            },
+            include: [{
+                as : "nannies",
+                model: Nanny,
+                include: [{
+                    as : "user",
+                    model: User
+                }]
+            },
+                {
+                    as: "nuser",
+                    model: User
+                }]
+        }).then(result => {
+            console.log(result);
+            if(result){
+                result.forEach(function(item){
+                    /*                    console.log(item.nannies);
+                                        console.log(item.nuser);
+                                        console.log(item.nannies[0].user);*/
+                    let nannyNames = [];
+                    let text = "";
+                    item.nannies.forEach(function(itemN){
+                        nannyNames.push((itemN.user.name) ? itemN.user.name : "Без имени");
+                        if(itemN.user.telegram_id){
+                            bot.telegram.sendMessage(itemN.user.telegram_id, "" +
+                                "Заказ № <b>" + item.id + "</b> завершен! Благодарим Вас за оказанные услуги!.\n" +
+                                "Информация о заказе:\n" +
+                                "<b>Дата начала:</b> " + moment(item.start).format("dddd, D MMMM YYYY, HH:mm:ss") + "\n",
+                                "<b>Дата окончания:</b> " + moment(item.end).format("dddd, D MMMM YYYY, HH:mm:ss") + "\n" +
+                                "<b>Общее количество детей:</b> " + item.child_count + "\n" +
+                                "<b>Количество детей мл. 18мес.:</b> " + item.babies + "\n" +
+                                "<b>Количество нянь:</b> " + nannyNames.length,
+                                {parse_mode:"html"});
+                        }
+                        text = text + "<a href='http://supernanny.kz/" + itemN.id+"'>" +
+                            ((itemN.user.name) ? itemN.user.name : "Без имени") + "</a>\n"
+                    });
+
+
+                    if(item.nuser.telegram_id){
+                        bot.telegram.sendMessage(item.nuser.telegram_id, 'Ваш заказ № <b>' + item.id + '</b> завершен!' +
+                            'Благодарим за использование Сервиса почасовых супернянь.\n' +
+                            "Оставьте, пожалуйста, комментарии о наших нянях:" +
+                            text
+                            , {parse_mode: "html"});
+                    }
+                });
+            }
+        })
+    },
+    start: true,
+    timeZone: 'Asia/Almaty'
+});
+
 console.log(cronSenderStartOrder.running);
 console.log(bot);
 /*let cronSenderEndOrder = new CronJob({
