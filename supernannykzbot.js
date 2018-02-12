@@ -992,7 +992,7 @@ function makeDatePicker(ctx, time, type = "start") {
 
     let val = (type === "start") ? "timePicker_start" : "timePicker_end";
     let text = (type === "start")
-        ?   '<b>Выбранный день: </b>\n' + userSessions.getOrderDateRe(ctx, "start") +
+        ?   '<b>Выбранный день: </b>' + userSessions.getOrderDateRe(ctx, "start") +
             '\nВыберите время <b>начала</b>  заказа. \nПрибавте либо отнимите промежуток времени при помощи кнопок ниже,' +
             ' иначе нажмите "Готово" если указанное время Вас устраивает'
         :   '<b>Дата начала заказа:</b>\n' + userSessions.getOrderFullTimeRe(ctx, "start") + "\n" +
@@ -1110,15 +1110,12 @@ function sendFreeNannies(ctx) {
     userSessions.deleteSessionMessages(ctx);
     let nanniesCount = userSessions.getCountNannies(ctx); //количество нянь
     let selectedNannies = userSessions.getSelectedNannies(ctx); //выбранные няни
-    let epxNannies = "";
+    let epxNannies = selectedNannies.join(',');
 
     if (selectedNannies.length < nanniesCount) {
         let countChildren = userSessions.getCountChildren(ctx);
         let countBaby = userSessions.getCountMiniChildren(ctx);
 
-        selectedNannies.forEach(function (item) {
-            epxNannies = (epxNannies) ? "," + item : ""+item;
-        });
         epxNannies = epxNannies.substr(0, epxNannies.length - 1);
         let query = "" +
             "SELECT nannies.id, nannies.biography, nannies.user_id, users.photo  FROM nannies " +
@@ -1134,7 +1131,7 @@ function sendFreeNannies(ctx) {
             "' AND '" + userSessions.getOrderFullTime(ctx, "end") + "' " +
             ") " +
             "AND nannies.hourly = 1 " +
-            "AND nannies.id NOT IN (0" + ((epxNannies) ? epxNannies : "") + ") " +
+            "AND nannies.id NOT IN (" + ((epxNannies) ? epxNannies : "0") + ") " +
             "" +
             "LIMIT 8";
         console.log("2" + query);
@@ -1263,24 +1260,24 @@ function saveOrderStartPay(ctx, type) {
                         payed_type: type,
                         order_id: order.id,
                         babies: session.countMiniChildren
-                    }).then(norder => {
-                        if (norder) {
+                    }).then(norderR => {
+                        if (norderR) {
                             session.selectedNannies.forEach(function(item){
                                 NannyOrder.create({
                                     nanny_id: item,
-                                    norder_id: norder.id
+                                    norder_id: norderR.id
                                 });
                             });
                             let systemTypeM = (type === "qiwi") ? "QIWI терминал" : "банковская карта";
-                            let message = 'Ваш заказ № <b>' + norder.id + '</b> сохранен, но не оплачен.\n' +
-                                '<b>Сумма к оплате:</b> ' + norder.amount + '\n' +
-                                '<b>Дата начала заказа:</b> ' + moment(norder.start).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
-                                '<b>Дата окончания заказа:</b> ' + moment(norder.end).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
-                                '<b>Количество детей:</b> ' + norder.child_count + '\n' +
+                            let message = 'Ваш заказ № <b>' + norderR.id + '</b> сохранен, но не оплачен.\n' +
+                                '<b>Сумма к оплате:</b> ' + norderR.amount + '\n' +
+                                '<b>Дата начала заказа:</b> ' + moment(norderR.start).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
+                                '<b>Дата окончания заказа:</b> ' + moment(norderR.end).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
+                                '<b>Количество детей:</b> ' + norderR.child_count + '\n' +
                                 '<b>Количество нянь:</b> ' + session.countNannies + '\n' +
                                 '<b>Система оплаты:</b> ' + systemTypeM + '\n';
                             let howPayMessage = (type === "qiwi") ? "Инструкция к оплате...\n" : "Для продолжения оплаты перейдите по ссылке: http://supernanny.kz" +
-                                "/payments/telegram/payorder?phone=" + session.phone + "&order=" + order.id + " \n";
+                                "/payments/telegram/payorder?phone=" + session.phone + "&order=" + norderR.id + " \n";
                             let postMessage = "Для просмотра своих заказов нажмите кнопку:\n \"🗓 Мои заказы\"";
                             message = message + howPayMessage + postMessage;
                             ctx.reply(message, {
