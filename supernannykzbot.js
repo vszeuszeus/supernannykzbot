@@ -1115,8 +1115,6 @@ function sendFreeNannies(ctx) {
     if (selectedNannies.length < nanniesCount) {
         let countChildren = userSessions.getCountChildren(ctx);
         let countBaby = userSessions.getCountMiniChildren(ctx);
-
-        epxNannies = epxNannies.substr(0, epxNannies.length - 1);
         let query = "" +
             "SELECT nannies.id, nannies.biography, nannies.user_id, users.photo  FROM nannies " +
             "RIGHT JOIN users ON nannies.user_id = users.id " +
