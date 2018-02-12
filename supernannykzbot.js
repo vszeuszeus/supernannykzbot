@@ -517,8 +517,10 @@ bot.hears('🗓 Мои заказы', (ctx) => {
                     user_id: user.id
                 },
                 include: [{
+                    as : "nannies",
                     model: Nanny,
                     include: [{
+                        as : "users",
                         model: User
                     }]
                 }]
