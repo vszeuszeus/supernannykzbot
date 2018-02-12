@@ -133,9 +133,21 @@ const Order = sequelize.define('orders', {
     option: Sequelize.ENUM('expr', 'qiwi', 'kkb', 'n/n')
 });
 
-Nanny.hasMany(NannyOrders, {foreignKey: "nanny_id", as: "orders"});
-NannyOrders.belongsTo(Nanny, {foreignKey: "nanny_id"});
+Nanny.belongsToMany(NOrder, {
+    as : 'norders',
+    through: 'nanny_orders',
+    foreignKey: 'nanny_id'
+});
+NOrder.belongsToMany(Nanny, {
+    as:'nannies',
+    through: 'nanny_orders',
+    foreignKey: 'norder_id'
+});
+NOrder.belongsTo(User, {
+    foreignKey: "user_id"
+});
 Nanny.belongsTo(User, {foreignKey: "user_id"});
+
 
 //END MODELS
 
@@ -169,7 +181,6 @@ let userSessions = {
                 session.offer &&
                 session.phone &&
                 session.countChildren &&
-                session.countMiniChildren &&
                 session.order.startTime &&
                 session.order.endTime &&
                 session.order.startDate &&
@@ -1122,7 +1133,7 @@ function sendFreeNannies(ctx) {
             " AND norders.end BETWEEN '" + userSessions.getOrderFullTime(ctx, "start") +
             "' AND '" + userSessions.getOrderFullTime(ctx, "end") + "' " +
             ") " +
-            //"AND nannies.hourly = 1 " +
+            "AND nannies.hourly = 1 " +
             "AND nannies.id NOT IN (0" + ((epxNannies) ? epxNannies : "") + ") " +
             "" +
             "LIMIT 8";
@@ -1154,7 +1165,7 @@ function sendFreeNannies(ctx) {
                                 }
                             );
                             nannies[0].forEach(function (item) {
-                                ctx.replyWithPhoto({source: "image.jpeg"/*"../../www/supernanny.kz/app/webroot" + item.photo*/}, {
+                                ctx.replyWithPhoto({source: "../../www/supernanny.kz/app/webroot" + item.photo}, {
                                     caption: item.biography.substr(0, 197) + "...",
                                     reply_markup: {
                                         inline_keyboard: [
