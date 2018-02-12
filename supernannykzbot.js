@@ -75,7 +75,7 @@ const User = sequelize.define('users', {
     photo: Sequelize.STRING
 });
 
-const NannyOrders = sequelize.define('nanny_orders', {
+const NannyOrder = sequelize.define('nanny_orders', {
     id:
         {
             type: Sequelize.BIGINT,
@@ -952,7 +952,7 @@ function sendOrderDateChooser(ctx, type = "start", error = "") {
             break;
         case "end":
             message = "<b>Пожалуйста, выберите в календаре день окончания заказа.</b>\n" +
-                "Начальная дата - <b>" + userSessions.getOrderFullTimeRe(ctx, "start") + "</b>";
+                "<b>День начала заказа:</b>\n" + userSessions.getOrderFullTimeRe(ctx, "start");
             break;
     }
     message += '\nСтоимость нянь:\n' +
