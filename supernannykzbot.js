@@ -2,7 +2,7 @@ const Telegraf = require('telegraf');
 const Sequelize = require('sequelize');
 const Calendar = require('telegraf-calendar-telegram');
 const moment = require('moment');
-
+const CronJob = require('cron').CronJob;
 moment.locale('ru');
 moment.updateLocale('ru', {
     months: [
@@ -17,8 +17,8 @@ moment.updateLocale('ru', {
 });
 
 //const token = "494928840:AAHD8Aiven5HcWQf-9k2WLQsv5S8WStITi0";
-//const token = "497454060:AAHiV3SLyh5uNs21ifikpzwfOWMLAyHjfN8"; //testerhomenko
-const token = "485527689:AAHKpVXaxb6M1GXcZO7gz7mzQWJ8f9IM2w8"; //main
+const token = "497454060:AAHiV3SLyh5uNs21ifikpzwfOWMLAyHjfN8"; //testerhomenko
+//const token = "485527689:AAHKpVXaxb6M1GXcZO7gz7mzQWJ8f9IM2w8"; //main
 
 const bot = new Telegraf(token);
 
@@ -31,20 +31,20 @@ const calendar = new Calendar(bot, {
     ]
 });
 
-/*const database = "supernanny";
+const database = "supernanny";
 const user = "root";
 const password = "s12q!Bza";
-const host = "localhost";*/
+const host = "localhost";
 
-const database = "supernanny";
+/*const database = "supernanny";
 const user = "supernannydb";
 const password = "93TntM9aWgWM3NDVBqoW";
-const host = "localhost";
+const host = "localhost";*/
 
 const sequelize = new Sequelize(database, user, password, {
     timezone: "+06:00",
     host: host,
-    port: 3310,
+    port: 3306,
     dialect: 'mysql',
     pool: {
         max: 20,
@@ -143,13 +143,102 @@ NOrder.belongsToMany(Nanny, {
     foreignKey: 'norder_id'
 });
 NOrder.belongsTo(User, {
-    foreignKey: "user_id"
+    as: "nuser", foreignKey: "user_id"
 });
 Nanny.belongsTo(User, {as: 'user', foreignKey: "user_id"});
 
 
-//END MODELS
 
+// CRON
+let cronSenderStartOrder = new CronJob({
+    cronTime: '0 * * * * *',
+    onTick: function() {
+        let dataTimeNextHour = moment().add(1, 'h');
+        NOrder.findAll({
+            where: {
+                start: dataTimeNextHour
+            },
+            include: [{
+                as : "nannies",
+                model: Nanny,
+                include: [{
+                    as : "user",
+                    model: User
+                }]
+            },
+            {
+                as: "nuser",
+                model: User
+            }]
+        }).then(result => {
+            console.log(result);
+            if(result){
+                result.forEach(function(item){
+                    console.log(item.nannies);
+                    console.log(item.nuser);
+                    console.log(item.nannies[0].user);
+                    let nannyNames = [];
+                    item.nannies.forEach(function(itemN){
+                        nannyNames.push((itemN.user.name) ? itemN.user.name : "Без имени");
+                        if(itemN.user.telegram_id){
+                            bot.telegram.sendMessage(itemN.user.telegram_id, "" +
+                                "Заказ № <b>" + item.id + "</b> начинается через 1 час. Пожалуйста, не опаздывайте!\n" +
+                                "Информация о заказе:\n" +
+                                "<b>Дата начала:</b> " + moment(item.start).format("dddd, D MMMM YYYY, HH:mm:ss") + "\n",
+                                "<b>Дата окончания:</b> " + moment(item.end).format("dddd, D MMMM YYYY, HH:mm:ss") + "\n" +
+                                "<b>Общее количество детей:</b> " + item.child_count + "\n" +
+                                "<b>Количество детей мл. 18мес.:</b> " + item.babies + "\n" +
+                                "<b>Количество нянь:</b> " + nannyNames.length,
+                                {parse_mode:"html"});
+                        }
+                    });
+                    if(item.nuser.telegram_id){
+                        bot.telegram.sendMessage(item.nuser.telegram_id, 'Ваш заказ № <b>' + item.id + '</b> начинается через <b>1</b> час.\n' +
+                            ((nannyNames.length === 1) ? "Суперняня " : "Суперняни ") + nannyNames.join(', ') + " " +
+                            ((nannyNames.length === 1) ? "прилетит " : "прилетят ") + "" +
+                            "в " + moment(item.start).format("dddd, D MMMM YYYY, HH:mm:ss"), {parse_mode: "html"});
+                    }
+                });
+            }
+        })
+    },
+    start: true,
+    timeZone: 'Asia/Almaty'
+});
+console.log(cronSenderStartOrder.running);
+console.log(bot);
+/*let cronSenderEndOrder = new CronJob({
+    cronTime: '0 * * * *',
+    onTick: function() {
+        let dataTimeNow = moment();
+        NOrder.findAll({
+            where: {
+                start: dataTimeNow
+            },
+            include: [{
+                as : "nannies",
+                model: Nanny,
+                include: [{
+                    as : "user",
+                    model: User
+                }]
+            },
+                {
+                    model: User
+                }]
+        }).then(result => {
+            if(result){
+                result.forEach(function(item){
+
+                });
+            }
+
+        })
+    },
+    start: false,
+    timeZone: 'Asia/Almaty'
+});
+cronSenderEndOrder.start();*/
 
 let userSessions = {
     setNewSession: function (ctx, NewUserSession) {
@@ -170,8 +259,6 @@ let userSessions = {
     },
     testSession: function (ctx) {
         let session = userSessions.getSession(ctx);
-        console.log("-------------------");
-        console.log(session);
         if (session) {
             if (
                 session.telegram_id &&
@@ -193,7 +280,6 @@ let userSessions = {
         let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
         if (userSessions.hasOwnProperty(chat_id)) {
             delete userSessions[chat_id];
-            console.log(userSessions);
         } else {
             return false;
         }
@@ -407,7 +493,6 @@ let userSessions = {
         }
     }
 };
-console.log(userSessions);
 let NewUserSession = function (ctx) {
     this.telegram_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
     this.userId = null;
@@ -524,7 +609,6 @@ bot.hears('🗓 Мои заказы', (ctx) => {
                     }]
                 }]
             }).then(orders => {
-                console.log(orders);
                 if (orders.length) {
                     orders.forEach(function (item, index) {
                         let status = (item.is_payed === 0) ? "не оплачен" : "оплачен";
@@ -547,7 +631,6 @@ bot.hears('🗓 Мои заказы', (ctx) => {
                 }
             });
         } else {
-            console.log(user);
             ctx.reply('<b>Список Ваших заказов пуст!</b>', {
                 parse_mode: "HTML"
             });
@@ -612,12 +695,11 @@ bot.on('contact', (ctx) => {
             });
             break;
         default :
-            console.log('asdasd');
+            break;
     }
 });
 
 bot.on('callback_query', (ctx) => {
-    console.log(userSessions);
     let cData = ctx.update.callback_query.data;
     let splitData = cData.split('_');
     switch (splitData[0]) {
@@ -720,7 +802,6 @@ bot.on('callback_query', (ctx) => {
             break;
 
         default:
-            console.log('good');
             break;
     }
 
@@ -1002,7 +1083,6 @@ function makeDatePicker(ctx, time, type = "start") {
             '\nВыберите время <b>окончания</b>  заказа. \nПрибавте либо отнимите промежуток времени при помощи кнопок ниже,' +
             ' иначе нажмите "Готово" если указанное время Вас устраивает'
     ;
-    console.log(text);
     let step = (type === "start") ? "6" : "8";
     addMainMenu(ctx, "Шаг № " + step).then(result => {
         ctx.reply(text, {
@@ -1136,7 +1216,6 @@ function sendFreeNannies(ctx) {
             "LIMIT 8";
         sequelize.query(query)
             .then(nannies => {
-                    console.log(nannies);
                     if (nannies) {
                         addMainMenu(ctx, "Шаг № 9").then(result => {
                             let toMes = '' +
@@ -1151,7 +1230,6 @@ function sendFreeNannies(ctx) {
                                 'Нужно выбрать еще <b>' + (nanniesCount - selectedNannies.length) + "</b> " +
                                 (((nanniesCount - selectedNannies.length) === 1) ? "нянь." : "няни.") + "\n" +
                                 'В выбранное время могут работать следующие няни:';
-                            console.log(toMes);
                             ctx.reply(toMes, {parse_mode:"html"}).then(
                                 result => {
                                     if (result.message_id) {
@@ -1161,7 +1239,7 @@ function sendFreeNannies(ctx) {
                             );
                             nannies[0].forEach(function (item) {
                                 ctx.replyWithPhoto({source: "../../www/supernanny.kz/app/webroot" + item.photo}, {
-                                    caption: item.biography.substr(0, 149) + '...\n' + 'Посмотреть на сайте\nhttp://supernanny.kz/' + item.id + '/',
+                                    caption: item.biography.substr(0, 149) + '...\n' + 'Посмотреть на сайте - http://supernanny.kz/' + item.id + '/',
                                     reply_markup: {
                                         inline_keyboard: [
                                             [{text: "Пригласить", callback_data: "chooseNanny_" + item.id}]
@@ -1269,7 +1347,7 @@ function saveOrderStartPay(ctx, type) {
                             });
                             let systemTypeM = (type === "qiwi") ? "QIWI терминал" : "банковская карта";
                             let message = 'Ваш заказ № <b>' + norderR.id + '</b> сохранен, но не оплачен.\n' +
-                                '<b>Сумма к оплате:</b> ' + norderR.amount + '\n' +
+                                '<b>Сумма к оплате:</b> ' + norderR.amount + 'тенге \n' +
                                 '<b>Дата начала заказа:</b> ' + moment(norderR.start).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
                                 '<b>Дата окончания заказа:</b> ' + moment(norderR.end).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
                                 '<b>Количество детей:</b> ' + norderR.child_count + '\n' +
