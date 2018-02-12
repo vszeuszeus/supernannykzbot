@@ -30,20 +30,20 @@ const calendar = new Calendar(bot, {
     ]
 });
 
-/*const database = "supernanny";
-const user = "root";
-const password = "123";
-const host = "localhost";*/
-
 const database = "supernanny";
+const user = "root";
+const password = "s12q!Bza";
+const host = "localhost";
+
+/*const database = "supernanny";
 const user = "supernannydb";
 const password = "93TntM9aWgWM3NDVBqoW";
-const host = "localhost";
+const host = "localhost";*/
 
 const sequelize = new Sequelize(database, user, password, {
     timezone: "+06:00",
     host: host,
-    port: 3310,
+    port: 3306,
     dialect: 'mysql',
     pool: {
         max: 20,
@@ -144,7 +144,7 @@ NOrder.belongsToMany(Nanny, {
 NOrder.belongsTo(User, {
     foreignKey: "user_id"
 });
-Nanny.belongsTo(User, {foreignKey: "user_id"});
+Nanny.belongsTo(User, {as: 'user', foreignKey: "user_id"});
 
 
 //END MODELS
@@ -518,7 +518,7 @@ bot.hears('🗓 Мои заказы', (ctx) => {
                     as : "nannies",
                     model: Nanny,
                     include: [{
-                        as : "users",
+                        as : "user",
                         model: User
                     }]
                 }]
@@ -530,12 +530,12 @@ bot.hears('🗓 Мои заказы', (ctx) => {
                         ctx.reply("" +
                             "<b>1. Идентификатор заказа:</b> " + item.id + "\n" +
                             "<b>2. Дата создания:</b> " + moment(item.created_at).format("dddd, D MMMM YYYY, HH:mm:ss") + "\n" +
-                            "<b>3. Начальная дата:</b> " + moment(item.start).format("dddd, D MMMM YYYY, HH:mm:ss") + "\n" +
-                            "<b>4. Конечная дата:</b> " + moment(item.end).format("dddd, D MMMM YYYY, HH:mm:ss") + "\n" +
+                            "<b>3. Дата начала:</b> " + moment(item.start).format("dddd, D MMMM YYYY, HH:mm:ss") + "\n" +
+                            "<b>4. Дата окончания:</b> " + moment(item.end).format("dddd, D MMMM YYYY, HH:mm:ss") + "\n" +
                             "<b>5. Сумма к оплате:</b> " + item.amount + " тенге \n" +
                             "<b>6. Статус:</b> " + status + "\n" +
                             "<b>7. Количество детей:</b> " + item.child_count + "\n" +
-                            "<b>8. Имя няни:</b> " + item.nanny.user.name + "\n", {
+                            "<b>7. Количество нянь:</b> " + item.nannies.length + "\n", {
                             parse_mode: "HTML"
                         });
                     })
@@ -1160,12 +1160,13 @@ function sendFreeNannies(ctx) {
                             );
                             nannies[0].forEach(function (item) {
                                 ctx.replyWithPhoto({source: "../../www/supernanny.kz/app/webroot" + item.photo}, {
-                                    caption: item.biography.substr(0, 197) + "...",
+                                    caption: item.biography.substr(0, 155) + '...\n' + 'Посмотреть на сайте\nhttp://supernanny.kz/' + item.id + '/',
                                     reply_markup: {
                                         inline_keyboard: [
                                             [{text: "Пригласить", callback_data: "chooseNanny_" + item.id}]
                                         ]
-                                    }
+                                    },
+                                    parse_mode:'html'
                                 }).then(result => {
                                     if (result.message_id) {
                                         userSessions.setSessionSendedMessage(ctx, result.message_id);
