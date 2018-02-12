@@ -43,7 +43,7 @@ const host = "localhost";
 const sequelize = new Sequelize(database, user, password, {
     timezone: "+06:00",
     host: host,
-    port: 3306,
+    port: 3310,
     dialect: 'mysql',
     pool: {
         max: 20,
@@ -850,7 +850,7 @@ function sendChildCountChooser(ctx) {
     userSessions.deleteSessionMessages(ctx);
     addMainMenu(ctx, "Шаг № 3").then(result => {
         ctx.reply(
-            '<b>Для какого количества детей Вам нужна няня?</b>\n ' +
+            '<b>Для какого количества детей Вам нужна няня?</b>\n' +
             'Стоимость нянь:\n' +
             'С <b>09.00</b> до <b>21.00</b> – 1 час 1500 тг. (1,2 ребёнка), 2000 (3 ребёнка) \n' +
             'С <b>21.00</b> до <b>09.00</b> – 1 час 2000 тг (1,2 ребёнка), 2500 тг (3 ребёнка)\n' +
@@ -992,13 +992,13 @@ function makeDatePicker(ctx, time, type = "start") {
 
     let val = (type === "start") ? "timePicker_start" : "timePicker_end";
     let text = (type === "start")
-        ?   '<b>Выбранный день:</b>\n' + userSessions.getOrderDateRe(ctx, "start") +
+        ?   '<b>Выбранный день: </b>\n' + userSessions.getOrderDateRe(ctx, "start") +
             '\nВыберите время <b>начала</b>  заказа. \nПрибавте либо отнимите промежуток времени при помощи кнопок ниже,' +
-            ' иначе нажмите "Готово", если указанное время Вас устраивает'
-        :   '<b>Дата начала заказа:</b>' + userSessions.getOrderFullTimeRe(ctx, "start") + "\n" +
+            ' иначе нажмите "Готово" если указанное время Вас устраивает'
+        :   '<b>Дата начала заказа:</b>\n' + userSessions.getOrderFullTimeRe(ctx, "start") + "\n" +
             "<b>День окончания заказа:</b>\n" + userSessions.getOrderDateRe(ctx, "end") +
             '\nВыберите время <b>окончания</b>  заказа. \nПрибавте либо отнимите промежуток времени при помощи кнопок ниже,' +
-            ' иначе нажмите "Готово", если указанное время Вас устраивает'
+            ' иначе нажмите "Готово" если указанное время Вас устраивает'
     ;
     console.log(text);
     let step = (type === "start") ? "6" : "8";
