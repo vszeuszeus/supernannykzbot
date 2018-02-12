@@ -512,7 +512,7 @@ bot.hears('🗓 Мои заказы', (ctx) => {
         }
     }).then(user => {
         if (user) {
-            NannyOrders.findAll({
+            NOrder.findAll({
                 where: {
                     user_id: user.id
                 },
@@ -523,6 +523,7 @@ bot.hears('🗓 Мои заказы', (ctx) => {
                     }]
                 }]
             }).then(orders => {
+                console.log(orders);
                 if (orders.length) {
                     orders.forEach(function (item, index) {
                         let status = (item.is_payed === 0) ? "не оплачен" : "оплачен";
@@ -1132,8 +1133,6 @@ function sendFreeNannies(ctx) {
             "AND nannies.id NOT IN (" + ((epxNannies) ? epxNannies : "0") + ") " +
             "" +
             "LIMIT 8";
-        console.log("2" + query);
-        console.log(query);
         sequelize.query(query)
             .then(nannies => {
                     console.log(nannies);
