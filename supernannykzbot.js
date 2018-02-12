@@ -17,8 +17,8 @@ moment.updateLocale('ru', {
 });
 
 //const token = "494928840:AAHD8Aiven5HcWQf-9k2WLQsv5S8WStITi0";
-const token = "497454060:AAHiV3SLyh5uNs21ifikpzwfOWMLAyHjfN8"; //testerhomenko
-//const token = "485527689:AAHKpVXaxb6M1GXcZO7gz7mzQWJ8f9IM2w8"; //main
+//const token = "497454060:AAHiV3SLyh5uNs21ifikpzwfOWMLAyHjfN8"; //testerhomenko
+const token = "485527689:AAHKpVXaxb6M1GXcZO7gz7mzQWJ8f9IM2w8"; //main
 
 const bot = new Telegraf(token);
 
@@ -31,15 +31,15 @@ const calendar = new Calendar(bot, {
     ]
 });
 
-const database = "supernanny";
+/*const database = "supernanny";
 const user = "root";
 const password = "s12q!Bza";
-const host = "localhost";
+const host = "localhost";*/
 
-/*const database = "supernanny";
+const database = "supernanny";
 const user = "supernannydb";
 const password = "93TntM9aWgWM3NDVBqoW";
-const host = "localhost";*/
+const host = "localhost";
 
 const sequelize = new Sequelize(database, user, password, {
     timezone: "+06:00",
@@ -174,9 +174,9 @@ let cronSenderStartOrder = new CronJob({
             console.log(result);
             if(result){
                 result.forEach(function(item){
-                    console.log(item.nannies);
+/*                    console.log(item.nannies);
                     console.log(item.nuser);
-                    console.log(item.nannies[0].user);
+                    console.log(item.nannies[0].user);*/
                     let nannyNames = [];
                     item.nannies.forEach(function(itemN){
                         nannyNames.push((itemN.user.name) ? itemN.user.name : "Без имени");
