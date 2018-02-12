@@ -882,7 +882,7 @@ function sendChildCountChooser(ctx) {
 function sendMiniChildCount(ctx) {
     userSessions.deleteSessionMessages(ctx);
     let childs = userSessions.getCountChildren(ctx);
-    let keyboard = [];
+    let keyboard = [{text: "Нету", callback_data: "countMiniChildren_0"}];
     for (let i = 1; i <= childs; i++) {
         keyboard.push({text: i, callback_data: "countMiniChildren_" + i})
     }
@@ -915,7 +915,7 @@ function sendMiniChildCount(ctx) {
 function sendChildYears(ctx) {
     userSessions.deleteSessionMessages(ctx);
 
-    addMainMenu(ctx, message).then(result => {
+    addMainMenu(ctx, "Шаг № 4").then(result => {
         ctx.reply("Пожалуйста, выберите возраст ребенка", {
             "reply_markup": {
                 "inline_keyboard": [
@@ -1161,7 +1161,7 @@ function sendFreeNannies(ctx) {
                             );
                             nannies[0].forEach(function (item) {
                                 ctx.replyWithPhoto({source: "../../www/supernanny.kz/app/webroot" + item.photo}, {
-                                    caption: item.biography.substr(0, 155) + '...\n' + 'Посмотреть на сайте\nhttp://supernanny.kz/' + item.id + '/',
+                                    caption: item.biography.substr(0, 155) + '...\n' + 'Посмотреть на сайте\nhttp://supernanny.kz/234234' + item.id + '/',
                                     reply_markup: {
                                         inline_keyboard: [
                                             [{text: "Пригласить", callback_data: "chooseNanny_" + item.id}]
