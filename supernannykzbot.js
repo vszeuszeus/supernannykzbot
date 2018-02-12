@@ -134,12 +134,10 @@ const Order = sequelize.define('orders', {
 });
 
 Nanny.belongsToMany(NOrder, {
-    as : 'norders',
     through: 'nanny_orders',
     foreignKey: 'nanny_id'
 });
 NOrder.belongsToMany(Nanny, {
-    as:'nannies',
     through: 'nanny_orders',
     foreignKey: 'norder_id'
 });
