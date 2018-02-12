@@ -17,7 +17,8 @@ moment.updateLocale('ru', {
 });
 
 //const token = "494928840:AAHD8Aiven5HcWQf-9k2WLQsv5S8WStITi0";
-const token = "497454060:AAHiV3SLyh5uNs21ifikpzwfOWMLAyHjfN8";
+//const token = "497454060:AAHiV3SLyh5uNs21ifikpzwfOWMLAyHjfN8"; //testerhomenko
+const token = "485527689:AAHKpVXaxb6M1GXcZO7gz7mzQWJ8f9IM2w8"; //main
 
 const bot = new Telegraf(token);
 
