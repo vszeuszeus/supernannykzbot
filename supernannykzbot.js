@@ -44,7 +44,7 @@ const host = "localhost";
 const sequelize = new Sequelize(database, user, password, {
     timezone: "+06:00",
     host: host,
-    port: 3306,
+    port: 3310,
     dialect: 'mysql',
     pool: {
         max: 20,
@@ -156,7 +156,8 @@ let cronSenderStartOrder = new CronJob({
         let dataTimeNextHour = moment().add(1, 'h');
         NOrder.findAll({
             where: {
-                start: dataTimeNextHour
+                start: dataTimeNextHour,
+                is_payed: 1
             },
             include: [{
                 as : "nannies",
