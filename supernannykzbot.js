@@ -270,8 +270,6 @@ let cronSenderEndOrder = new CronJob({
     timeZone: 'Asia/Almaty'
 });
 
-console.log(cronSenderStartOrder.running);
-console.log(bot);
 /*let cronSenderEndOrder = new CronJob({
     cronTime: '0 * * * *',
     onTick: function() {
@@ -1304,7 +1302,7 @@ function sendFreeNannies(ctx) {
                             );
                             nannies[0].forEach(function (item) {
                                 ctx.replyWithPhoto({source: "../../www/supernanny.kz/app/webroot" + item.photo}, {
-                                    caption: item.biography.substr(0, 149) + '...\n' + 'Посмотреть на сайте - http://supernanny.kz/' + item.id + '/',
+                                    caption: item.biography.substr(0, 140) + '...\n' + 'Посмотреть на сайте - http://supernanny.kz/' + item.id + '/',
                                     reply_markup: {
                                         inline_keyboard: [
                                             [{text: "Пригласить", callback_data: "chooseNanny_" + item.id}]
