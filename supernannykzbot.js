@@ -3,6 +3,7 @@ const Sequelize = require('sequelize');
 const Calendar = require('telegraf-calendar-telegram');
 const moment = require('moment');
 const CronJob = require('cron').CronJob;
+const AmountCalculator = require('amountCalculator');
 moment.locale('ru');
 moment.updateLocale('ru', {
     months: [
@@ -378,8 +379,7 @@ let userSessions = {
         } else {
             return false;
         }
-    }
-    ,
+    },
     setCountMiniChildren: function (ctx, count = 1) {
         let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
         if (userSessions.hasOwnProperty(chat_id)) {
@@ -388,10 +388,26 @@ let userSessions = {
             return false;
         }
     },
+    setSessionAmount: function (ctx, amount = 20) {
+        let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
+        if (userSessions.hasOwnProperty(chat_id)) {
+            userSessions[chat_id].amount = amount;
+        } else {
+            return false;
+        }
+    },
     getCountMiniChildren: function (ctx) {
         let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
         if (userSessions.hasOwnProperty(chat_id)) {
             return userSessions[chat_id].countMiniChildren;
+        } else {
+            return false;
+        }
+    },
+    getSessionAmount: function (ctx) {
+        let chat_id = (ctx.update.callback_query) ? ctx.update.callback_query.message.chat.id : ctx.update.message.chat.id;
+        if (userSessions.hasOwnProperty(chat_id)) {
+            return userSessions[chat_id].amount;
         } else {
             return false;
         }
@@ -827,6 +843,7 @@ bot.on('callback_query', (ctx) => {
                         break;
                     case "end":
                         if (testTime(ctx)) {
+                            calcAmount(ctx);
                             sendFreeNannies(ctx);
                         } else {
                             sendOrderDateChooser(ctx, "end", "Выбрано некорректное время! Конечное время бронирования должо быть большее начального времени не менее чем на час.");
@@ -876,6 +893,15 @@ function matchCountNanny(ctx) {
     let a = countC - countNanny;
     countNanny += (Math.floor(a / 3)) + ((a % 3 !== 0) ? 1 : 0);
     userSessions.setCountNannies(ctx, countNanny);
+}
+
+function calcAmount(ctx) {
+    let startDate = userSessions.getOrderFullTime(ctx, 'start');
+    let endDate = userSessions.getOrderFullTime(ctx, 'end');
+    let babies = userSessions.getCountMiniChildren(ctx);
+    let children = userSessions.getCountChildren(ctx);
+    let calcObj = new AmountCalculator(children, babies, startDate, endDate);
+    userSessions.setSessionAmount(ctx, calcObj.getResults())
 }
 
 function testTime(ctx) {
@@ -1288,7 +1314,7 @@ function sendFreeNannies(ctx) {
                                 moment(userSessions.getOrderFullTime(ctx, "end")).format("dddd, D MMMM YYYY, HH:mm:ss") + "\n" +
                                 '<b>Количество детей</b>: ' + countChildren + "\n" +
                                 '<b>Количество детей моложе 18мес.</b>: ' + countBaby + "\n" +
-                                '<b>Сумма заказа: </b>' + '20' + "\n" +
+                                '<b>Сумма заказа: </b>' + userSessions.getSessionAmount(ctx) + "\n" +
                                 '<b>Необходимо нянь</b>: ' + nanniesCount + "\n" +
                                 'Нужно выбрать еще <b>' + (nanniesCount - selectedNannies.length) + "</b> " +
                                 (((nanniesCount - selectedNannies.length) === 1) ? "нянь." : "няни.") + "\n" +
