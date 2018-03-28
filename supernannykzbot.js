@@ -1314,7 +1314,7 @@ function sendFreeNannies(ctx) {
                                 moment(userSessions.getOrderFullTime(ctx, "end")).format("dddd, D MMMM YYYY, HH:mm:ss") + "\n" +
                                 '<b>Количество детей</b>: ' + countChildren + "\n" +
                                 '<b>Количество детей моложе 18мес.</b>: ' + countBaby + "\n" +
-                                '<b>Сумма заказа: </b>' + userSessions.getSessionAmount(ctx) + "\n" +
+                                '<b>Сумма заказа: </b>' + userSessions.getSessionAmount(ctx) + " тг.\n" +
                                 '<b>Необходимо нянь</b>: ' + nanniesCount + "\n" +
                                 'Нужно выбрать еще <b>' + (nanniesCount - selectedNannies.length) + "</b> " +
                                 (((nanniesCount - selectedNannies.length) === 1) ? "нянь." : "няни.") + "\n" +
@@ -1436,7 +1436,7 @@ function saveOrderStartPay(ctx, type) {
                             });
                             let systemTypeM = (type === "qiwi") ? "QIWI терминал" : "банковская карта";
                             let message = 'Ваш заказ № <b>' + norderR.id + '</b> сохранен, но не оплачен.\n' +
-                                '<b>Сумма к оплате:</b> ' + norderR.amount + 'тенге \n' +
+                                '<b>Сумма к оплате:</b> ' + norderR.amount + '  тг. \n' +
                                 '<b>Дата начала заказа:</b> ' + moment(norderR.start).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
                                 '<b>Дата окончания заказа:</b> ' + moment(norderR.end).format("dddd, D MMMM YYYY, HH:mm:ss") + '\n' +
                                 '<b>Количество детей:</b> ' + norderR.child_count + '\n' +
