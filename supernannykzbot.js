@@ -3,7 +3,7 @@ const Sequelize = require('sequelize');
 const Calendar = require('telegraf-calendar-telegram');
 const moment = require('moment');
 const CronJob = require('cron').CronJob;
-const AmountCalculator = require('amountCalculator');
+const AmountCalculator = require('./amountCalculator');
 moment.locale('ru');
 moment.updateLocale('ru', {
     months: [
