@@ -106,27 +106,31 @@ module.exports = function (children, babies, start, end){
         console.log("final Nights H - " + this.finalNightHours);
         console.log("finalAmount - " + finalAmount);
         let amountGroups = [];
-        let childMod = this.children % 3;
-        let childDiff = this.children / 3;
-        switch(childMod){
-            case 0:
-                for(let i = 0; i < childDiff; i++){
-                    amountGroups.push(3);
-                }
-                break;
-            case 1:
-                let nowFloor = (Math.floor(childDiff) - 1);
-                for(let i = 0; i < nowFloor; i++){
-                    amountGroups.push(3);
-                }
-                amountGroups.push(2 , 2);
-                break;
-            case 2:
-                for(let i = 0; i < (Math.floor(childDiff)); i++){
-                    amountGroups.push(3);
-                }
-                amountGroups.push(2);
-                break;
+        if(this.children < 3){
+            amountGroups.push(2);
+        }else{
+            let childMod = this.children % 3;
+            let childDiff = this.children / 3;
+            switch(childMod){
+                case 0:
+                    for(let i = 0; i < childDiff; i++){
+                        amountGroups.push(3);
+                    }
+                    break;
+                case 1:
+                    let nowFloor = (Math.floor(childDiff) - 1);
+                    for(let i = 0; i < nowFloor; i++){
+                        amountGroups.push(3);
+                    }
+                    amountGroups.push(2 , 2);
+                    break;
+                case 2:
+                    for(let i = 0; i < (Math.floor(childDiff)); i++){
+                        amountGroups.push(3);
+                    }
+                    amountGroups.push(2);
+                    break;
+            }
         }
         let vm = this;
         amountGroups.forEach(function (item) {
