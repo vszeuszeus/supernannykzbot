@@ -135,6 +135,8 @@ const Order = sequelize.define('orders', {
     option: Sequelize.ENUM('expr', 'qiwi', 'kkb', 'n/n')
 });
 
+
+
 Nanny.belongsToMany(NOrder, {
     through: 'nanny_orders',
     foreignKey: 'nanny_id'
