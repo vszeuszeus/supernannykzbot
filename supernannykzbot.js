@@ -355,7 +355,7 @@ let userSessions = {
         if (userSessions.hasOwnProperty(chat_id)) {
             userSessions[chat_id].offer = offer;
         } else {
-            return false;
+            userSessions.setNewSession(ctx, new NewUserSession(ctx));
         }
     },
     setSessionCity: function (ctx, city = "Astana") {
@@ -727,7 +727,6 @@ calendar.setDateListener((ctx, calDate) => {
 });
 
 bot.on('contact', (ctx) => {
-
     userSessions.deleteSessionMessages(ctx);
     let phone = ctx.message.contact.phone_number.substr(ctx.message.contact.phone_number.length - 10);
     let name = (ctx.message.contact.first_name) ? ctx.message.contact.first_name : null;
@@ -781,112 +780,116 @@ bot.on('contact', (ctx) => {
 });
 
 bot.on('callback_query', (ctx) => {
-    let cData = ctx.update.callback_query.data;
-    let splitData = cData.split('_');
-    switch (splitData[0]) {
-        case "offer" :
-            switch (splitData[1]) {
-                case "yes":
-                    userSessions.setSessionOffer(ctx, true);
-                    sendQuestionCity(ctx);
-                    break;
-                case "no":
-                    sendNeedToAccessOffer(ctx);
-                    break;
-            }
-            break;
-
-        case "needCity":
-            switch (splitData[1]) {
-                case "Astana":
-                    userSessions.setSessionCity(ctx, "Astana");
-                    break;
-                case "Almata":
-                    userSessions.setSessionCity(ctx, "Almata");
-                    break;
-            }
-            sendChildCountChooser(ctx);
-            break;
-
-        case "countChildren":
-            let countChildren = +splitData[1];
-            userSessions.setCountChildren(ctx, countChildren);
-            (countChildren === 1) ? sendChildYears(ctx)
-                : sendMiniChildCount(ctx);
-            break;
-
-        case "yearChild":
-            let yearChild = +splitData[1];
-            (yearChild === 1) ? userSessions.setCountMiniChildren(ctx, 1)
-                : userSessions.setCountMiniChildren(ctx, 0);
-            matchCountNanny(ctx);
-            sendOrderDateChooser(ctx, "start");
-            break;
-
-        case "countMiniChildren":
-            let countMiniChildren = +splitData[1];
-            userSessions.setCountMiniChildren(ctx, countMiniChildren);
-            matchCountNanny(ctx);
-            sendOrderDateChooser(ctx, "start");
-            break;
-
-        case "timePicker":
-            if (splitData[1] === "start" || splitData[1] === "end") {
-                recalcTimePicker(ctx);
-            }
-            if (splitData[1] === "quit") {
-                switch (splitData[2]) {
-                    case "start":
-                        if (testTime(ctx)) {
-                            sendOrderDateChooser(ctx, "end");
-                        } else {
-                            sendOrderDateChooser(ctx, "start", "Выбрано некорректное время!");
-                        }
+    if(!userSessions.getSession(ctx)){
+        ctx.reply('Ваша сессия была разорвана, либо утеряна. Запуск главного меню...');
+        sendMenu(ctx);
+    }else{
+        let cData = ctx.update.callback_query.data;
+        let splitData = cData.split('_');
+        switch (splitData[0]) {
+            case "offer" :
+                switch (splitData[1]) {
+                    case "yes":
+                        userSessions.setSessionOffer(ctx, true);
+                        sendQuestionCity(ctx);
                         break;
-                    case "end":
-                        if (testTime(ctx)) {
-                            calcAmount(ctx);
-                            sendFreeNannies(ctx);
-                        } else {
-                            sendOrderDateChooser(ctx, "end", "Выбрано некорректное время! Конечное время бронирования должо быть большее начального времени не менее чем на час.");
-                        }
+                    case "no":
+                        sendNeedToAccessOffer(ctx);
+                        break;
                 }
-            }
-            break;
+                break;
 
-        case "chooseNanny":
-            userSessions.setSelectedNanny(ctx, +splitData[1]);
-            sendFreeNannies(ctx);
-            break;
+            case "needCity":
+                switch (splitData[1]) {
+                    case "Astana":
+                        userSessions.setSessionCity(ctx, "Astana");
+                        break;
+                    case "Almata":
+                        userSessions.setSessionCity(ctx, "Almata");
+                        break;
+                }
+                sendChildCountChooser(ctx);
+                break;
 
-        case "payment":
-            switch (splitData[1]) {
-                case "bankCard":
-                    saveOrderStartPay(ctx, "epay");
-                    break;
-                case "qiwi":
-                    saveOrderStartPay(ctx, "qiwi");
-                    break;
-            }
-            break;
+            case "countChildren":
+                let countChildren = +splitData[1];
+                userSessions.setCountChildren(ctx, countChildren);
+                (countChildren === 1) ? sendChildYears(ctx)
+                    : sendMiniChildCount(ctx);
+                break;
 
-        case "restart":
-            switch (splitData[1]) {
-                case "sendOffer":
-                    sendOffer(ctx);
-                    break;
-            }
-            break;
+            case "yearChild":
+                let yearChild = +splitData[1];
+                (yearChild === 1) ? userSessions.setCountMiniChildren(ctx, 1)
+                    : userSessions.setCountMiniChildren(ctx, 0);
+                matchCountNanny(ctx);
+                sendOrderDateChooser(ctx, "start");
+                break;
 
-        case "mainMenu":
-            userSessions.deleteSessionMessages(ctx);
-            sendMenu(ctx);
-            break;
+            case "countMiniChildren":
+                let countMiniChildren = +splitData[1];
+                userSessions.setCountMiniChildren(ctx, countMiniChildren);
+                matchCountNanny(ctx);
+                sendOrderDateChooser(ctx, "start");
+                break;
 
-        default:
-            break;
+            case "timePicker":
+                if (splitData[1] === "start" || splitData[1] === "end") {
+                    recalcTimePicker(ctx);
+                }
+                if (splitData[1] === "quit") {
+                    switch (splitData[2]) {
+                        case "start":
+                            if (testTime(ctx)) {
+                                sendOrderDateChooser(ctx, "end");
+                            } else {
+                                sendOrderDateChooser(ctx, "start", "Выбрано некорректное время!");
+                            }
+                            break;
+                        case "end":
+                            if (testTime(ctx)) {
+                                calcAmount(ctx);
+                                sendFreeNannies(ctx);
+                            } else {
+                                sendOrderDateChooser(ctx, "end", "Выбрано некорректное время! Конечное время бронирования должо быть большее начального времени не менее чем на час.");
+                            }
+                    }
+                }
+                break;
+
+            case "chooseNanny":
+                userSessions.setSelectedNanny(ctx, +splitData[1]);
+                sendFreeNannies(ctx);
+                break;
+
+            case "payment":
+                switch (splitData[1]) {
+                    case "bankCard":
+                        saveOrderStartPay(ctx, "epay");
+                        break;
+                    case "qiwi":
+                        saveOrderStartPay(ctx, "qiwi");
+                        break;
+                }
+                break;
+
+            case "restart":
+                switch (splitData[1]) {
+                    case "sendOffer":
+                        sendOffer(ctx);
+                        break;
+                }
+                break;
+
+            case "mainMenu":
+                userSessions.deleteSessionMessages(ctx);
+                sendMenu(ctx);
+                break;
+
+            default:
+                break;
+        }
     }
-
 });
 
 function matchCountNanny(ctx) {
@@ -929,7 +932,7 @@ function testTime(ctx) {
             let startTime = new Date(splitDateStart[0], splitDateStart[1] - 1, splitDateStart[2], splitTimeStart[0], splitTimeStart[1]);
             let endTime = new Date(splitDateEnd[0], splitDateEnd[1] - 1, splitDateEnd[2], splitTimeEnd[0], splitTimeEnd[1]);
             result = (endTime - startTime) / (1000 * 60 * 60);
-            if (result >= 1) {
+            if (result >= 3) {
                 return true;
             } else {
                 return false;
@@ -1118,7 +1121,8 @@ function sendChildYears(ctx) {
 function sendOrderDateChooser(ctx, type = "start", error = "") {
     userSessions.deleteSessionMessages(ctx);
     let message = "";
-    let preMessage = "\n<b>*Дата бронирования должна опережать текущее время не меньше чем на 3 часа.</b>";
+    let preMessage = "\n<b>*Дата бронирования должна опережать текущее время не меньше чем на 3 часа.</b>\n" +
+        "<b>*Заказы продолжительностью менее 3 часов не принимаются.</b>";
 
     switch (type) {
         case "start":
@@ -1292,15 +1296,22 @@ function sendFreeNannies(ctx) {
             "SELECT nannies.id, nannies.biography, nannies.user_id, users.photo  FROM nannies " +
             "RIGHT JOIN users ON nannies.user_id = users.id " +
             "WHERE NOT EXISTS (" +
-            " SELECT *" +
-            " FROM nanny_orders " +
-            " INNER JOIN norders ON nanny_orders.norder_id = norders.id " +
-            " WHERE nanny_orders.nanny_id = nannies.id" +
-            " AND norders.start BETWEEN '" + userSessions.getOrderFullTime(ctx, "start") +
-            "' AND '" + userSessions.getOrderFullTime(ctx, "end") + "' " +
-            " AND norders.end BETWEEN '" + userSessions.getOrderFullTime(ctx, "start") +
-            "' AND '" + userSessions.getOrderFullTime(ctx, "end") + "' " +
+                " SELECT *" +
+                " FROM nanny_orders " +
+                " INNER JOIN norders ON nanny_orders.norder_id = norders.id " +
+                " WHERE nanny_orders.nanny_id = nannies.id" +
+                " AND norders.start BETWEEN '" + userSessions.getOrderFullTime(ctx, "start") +
+                "' AND '" + userSessions.getOrderFullTime(ctx, "end") + "' " +
+                " AND norders.end BETWEEN '" + userSessions.getOrderFullTime(ctx, "start") +
+                "' AND '" + userSessions.getOrderFullTime(ctx, "end") + "' " +
             ") " +
+            "AND WHERE EXISTS ( " +
+                " SELECT * " +
+                " FROM worktimes " +
+                " WHERE worktimes.nanny_id = nannies.id " +
+                " AND worktimes.start <= '" + userSessions.getOrderFullTime(ctx, "start") + "' " +
+                " AND worktimes.end >= '" + userSessions.getOrderFullTime(ctx, "end") + "' "  +
+            ")" +
             "AND nannies.hourly = 1 " +
             "AND nannies.id NOT IN (" + ((epxNannies) ? epxNannies : "0") + ") " +
             "" +
