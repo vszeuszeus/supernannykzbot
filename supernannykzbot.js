@@ -1305,7 +1305,7 @@ function sendFreeNannies(ctx) {
                 " AND norders.end BETWEEN '" + userSessions.getOrderFullTime(ctx, "start") +
                 "' AND '" + userSessions.getOrderFullTime(ctx, "end") + "' " +
             ") " +
-            "AND WHERE EXISTS ( " +
+            "AND EXISTS ( " +
                 " SELECT * " +
                 " FROM worktimes " +
                 " WHERE worktimes.nanny_id = nannies.id " +
