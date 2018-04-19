@@ -1335,6 +1335,7 @@ function sendFreeNannies(ctx) {
                                 '<b>Количество детей моложе 18мес.</b>: ' + countBaby + "\n" +
                                 '<b>Сумма заказа: </b>' + userSessions.getSessionAmount(ctx) + " тг.\n" +
                                 '<b>Необходимо нянь</b>: ' + nanniesCount + "\n" +
+                                '<b>Доступно нянь</b>: ' + nannies.length + "\n" +
                                 'Нужно выбрать еще <b>' + (nanniesCount - selectedNannies.length) + "</b> " +
                                 (((nanniesCount - selectedNannies.length) === 1) ? "нянь." : "няни.") + "\n" +
                                 'В выбранное время могут работать следующие няни:';
