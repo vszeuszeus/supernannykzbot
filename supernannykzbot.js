@@ -1335,7 +1335,7 @@ function sendFreeNannies(ctx) {
                                 '<b>Количество детей моложе 18мес.</b>: ' + countBaby + "\n" +
                                 '<b>Сумма заказа: </b>' + userSessions.getSessionAmount(ctx) + " тг.\n" +
                                 '<b>Необходимо нянь</b>: ' + nanniesCount + "\n" +
-                                '<b>Доступно нянь</b>: ' + nannies.length + "\n" +
+                                '<b>Доступно нянь</b>: ' + nannies[0].length + "\n" +
                                 'Нужно выбрать еще <b>' + (nanniesCount - selectedNannies.length) + "</b> " +
                                 (((nanniesCount - selectedNannies.length) === 1) ? "нянь." : "няни.") + "\n" +
                                 'В выбранное время могут работать следующие няни:';
@@ -1343,42 +1343,42 @@ function sendFreeNannies(ctx) {
                                 result => {
                                     if (result.message_id) {
                                         userSessions.setSessionSendedMessage(ctx, result.message_id);
+                                        if(nannies[0].length < nanniesCount){
+                                            ctx.reply('К сожалению, мы не можем предоставить нужное количество нянь для выбраного времени. ' +
+                                                'Предлагаем Вам сменить время брони, либо уменьшить количество детей в заказе.', {
+                                                reply_markup: {
+                                                    inline_keyboard: [
+                                                        [
+                                                            {text: "Изменить время заказа", callback_data: "restart_time"},
+                                                            {text: "Изменить кол-во детей", callback_data: "restart_countChild"}
+                                                        ]
+                                                    ]
+                                                }
+                                            }).then(result => {
+                                                if (result.message_id) {
+                                                    userSessions.setSessionSendedMessage(ctx, result.message_id);
+                                                }
+                                            });
+                                        }else{
+                                            nannies[0].forEach(function (item) {
+                                                ctx.replyWithPhoto({source: "../../www/supernanny.kz/app/webroot" + item.photo}, {
+                                                    caption: item.biography.substr(0, 140) + '...\n' + 'Посмотреть на сайте - http://supernanny.kz/' + item.id + '/',
+                                                    reply_markup: {
+                                                        inline_keyboard: [
+                                                            [{text: "Пригласить", callback_data: "chooseNanny_" + item.id}]
+                                                        ]
+                                                    },
+                                                    parse_mode:'html'
+                                                }).then(result => {
+                                                    if (result.message_id) {
+                                                        userSessions.setSessionSendedMessage(ctx, result.message_id);
+                                                    }
+                                                });
+                                            });
+                                        }
                                     }
                                 }
                             );
-                            if(nannies.length < nanniesCount){
-                                ctx.reply('К сожалению, мы не можем предоставить нужное количество нянь для выбраного времени. ' +
-                                    'Предлагаем Вам сменить время брони, либо уменьшить количество детей в заказе.', {
-                                    reply_markup: {
-                                        inline_keyboard: [
-                                            [
-                                                {text: "Изменить время заказа", callback_data: "restart_time"},
-                                                {text: "Изменить кол-во детей", callback_data: "restart_countChild"}
-                                            ]
-                                        ]
-                                    }
-                                }).then(result => {
-                                    if (result.message_id) {
-                                        userSessions.setSessionSendedMessage(ctx, result.message_id);
-                                    }
-                                });
-                            }else{
-                                nannies[0].forEach(function (item) {
-                                    ctx.replyWithPhoto({source: "../../www/supernanny.kz/app/webroot" + item.photo}, {
-                                        caption: item.biography.substr(0, 140) + '...\n' + 'Посмотреть на сайте - http://supernanny.kz/' + item.id + '/',
-                                        reply_markup: {
-                                            inline_keyboard: [
-                                                [{text: "Пригласить", callback_data: "chooseNanny_" + item.id}]
-                                            ]
-                                        },
-                                        parse_mode:'html'
-                                    }).then(result => {
-                                        if (result.message_id) {
-                                            userSessions.setSessionSendedMessage(ctx, result.message_id);
-                                        }
-                                    });
-                                });
-                            }
                         });
                     }
                 }
