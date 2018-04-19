@@ -879,7 +879,7 @@ bot.on('callback_query', (ctx) => {
                         sendOffer(ctx);
                         break;
                     case "time":
-                        sendOrderTimeChooser(ctx, 'start');
+                        sendOrderDateChooser(ctx, 'start');
                         break;
                     case "countChild":
                         sendChildCountChooser(ctx);
