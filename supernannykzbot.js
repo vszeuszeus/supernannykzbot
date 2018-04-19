@@ -851,7 +851,7 @@ bot.on('callback_query', (ctx) => {
                                 calcAmount(ctx);
                                 sendFreeNannies(ctx);
                             } else {
-                                sendOrderDateChooser(ctx, "end", "Выбрано некорректное время! Конечное время бронирования должо быть большее начального времени не менее чем на час.");
+                                sendOrderDateChooser(ctx, "end", "Выбрано некорректное время! Минимальное время бронирования 3 часа.");
                             }
                     }
                 }
@@ -877,6 +877,12 @@ bot.on('callback_query', (ctx) => {
                 switch (splitData[1]) {
                     case "sendOffer":
                         sendOffer(ctx);
+                        break;
+                    case "time":
+                        sendOrderTimeChooser(ctx, 'start');
+                        break;
+                    case "countChild":
+                        sendChildCountChooser(ctx);
                         break;
                 }
                 break;
@@ -1032,7 +1038,7 @@ function sendChildCountChooser(ctx) {
             'С <b>09.00</b> до <b>21.00</b> – 1 час 1800 тг. (1,2 ребёнка), 2000 (3 ребёнка) \n' +
             'С <b>21.00</b> до <b>09.00</b> – 1 час 2000 тг (1,2 ребёнка), 2500 тг (3 ребёнка)\n' +
             'Каждя няня следит максимум за тремя детьми.\n' +
-            'Каждый ребенок моложе 18 мес. требует отдельного внимания няни.', {
+            'Каждый ребенок моложе 18 мес. требует внимания отдельной няни.', {
             "reply_markup": {
                 "inline_keyboard": [
                     [{text: "1", callback_data: "countChildren_1"},
@@ -1339,6 +1345,23 @@ function sendFreeNannies(ctx) {
                                     }
                                 }
                             );
+                            if(nannies.length < nanniesCount){
+                                ctx.reply('К сожалению, мы не можем предоставить нужное количество нянь для выбраного времени. ' +
+                                    'Предлагаем Вам сменить время брони, либо уменьшить количество детей в заказе.', {
+                                    reply_markup: {
+                                        inline_keyboard: [
+                                            [
+                                                {text: "Изменить время заказа", callback_data: "restart_time"},
+                                                {text: "Изменить кол-во детей", callback_data: "restart_countChild"}
+                                            ]
+                                        ]
+                                    }
+                                }).then(result => {
+                                    if (result.message_id) {
+                                        userSessions.setSessionSendedMessage(ctx, result.message_id);
+                                    }
+                                });
+                            }
                             nannies[0].forEach(function (item) {
                                 ctx.replyWithPhoto({source: "../../www/supernanny.kz/app/webroot" + item.photo}, {
                                     caption: item.biography.substr(0, 140) + '...\n' + 'Посмотреть на сайте - http://supernanny.kz/' + item.id + '/',
