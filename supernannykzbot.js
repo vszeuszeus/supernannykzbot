@@ -1361,22 +1361,23 @@ function sendFreeNannies(ctx) {
                                         userSessions.setSessionSendedMessage(ctx, result.message_id);
                                     }
                                 });
-                            }
-                            nannies[0].forEach(function (item) {
-                                ctx.replyWithPhoto({source: "../../www/supernanny.kz/app/webroot" + item.photo}, {
-                                    caption: item.biography.substr(0, 140) + '...\n' + 'Посмотреть на сайте - http://supernanny.kz/' + item.id + '/',
-                                    reply_markup: {
-                                        inline_keyboard: [
-                                            [{text: "Пригласить", callback_data: "chooseNanny_" + item.id}]
-                                        ]
-                                    },
-                                    parse_mode:'html'
-                                }).then(result => {
-                                    if (result.message_id) {
-                                        userSessions.setSessionSendedMessage(ctx, result.message_id);
-                                    }
+                            }else{
+                                nannies[0].forEach(function (item) {
+                                    ctx.replyWithPhoto({source: "../../www/supernanny.kz/app/webroot" + item.photo}, {
+                                        caption: item.biography.substr(0, 140) + '...\n' + 'Посмотреть на сайте - http://supernanny.kz/' + item.id + '/',
+                                        reply_markup: {
+                                            inline_keyboard: [
+                                                [{text: "Пригласить", callback_data: "chooseNanny_" + item.id}]
+                                            ]
+                                        },
+                                        parse_mode:'html'
+                                    }).then(result => {
+                                        if (result.message_id) {
+                                            userSessions.setSessionSendedMessage(ctx, result.message_id);
+                                        }
+                                    });
                                 });
-                            });
+                            }
                         });
                     }
                 }
